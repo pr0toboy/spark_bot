@@ -1,2 +1,2 @@
 def handle(ctx, user_input: str) -> None:
-    pass
+    print("🚀 Prêt à démarrer. Que veux-tu faire ?")
