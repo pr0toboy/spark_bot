@@ -50,4 +50,3 @@ pub fn all_commands() -> &'static [CommandInfo] {
         CommandInfo { name: "/weather",  command: Command::Weather,  description: "Affiche la météo d'une ville" },
     ]
 }
-

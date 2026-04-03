@@ -71,3 +71,9 @@ bot.rs (workflow principal)
 command_info.rs (parsing des commandes)
 structures.rs (Context / Reminder)
 src/commands/remind.rs, todo.rs, help.rs (implémentations concrètes)
+
+
+Apprend moi
+J'ai mon projet spark_bot qui me sert à apprendre à coder en rust: https://github.com/AelioCode/spark_bot
+Je veux que tu m'aides tel un professeur à coder une nouvelle fonctionnalité : /
+Ne me donne pas de code, juste guide moi
