@@ -1,2 +1,5 @@
 def handle(ctx, user_input: str) -> None:
-    pass
+    print("Que dois-je me souvenir ?")
+    ctx.memory = input("› ").strip()
+    ctx.save()
+    print("Ok, je m'en souviendrai !")
