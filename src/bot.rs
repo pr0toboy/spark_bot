@@ -4,13 +4,12 @@
 /// Boucle principale du projet qui traduit les commandes reçu en fonction à exécuter
 
 ////////////////////////////   IMPORT   ////////////////////////////////
-use std::collections::HashMap;
 use crate::core::input::{
     get_input,
     welcome_message
 };
 use crate::commands::{
-    help, localize, pomodoro, recall, remember, remind, start, todo
+    help, localize, pomodoro, recall, remember, remind, start, todo, weather
 };
 use crate::core::command_info::Command;
 use crate::core::structures::Context;
@@ -19,12 +18,6 @@ use crate::core::structures::Context;
 
 // Fonction principale de Spark
 pub fn spark_bot() {
-
-    let mut todo_commands: HashMap<&str, &str> = HashMap::new();
-    todo_commands.insert("/new", "Créer une nouvelle liste");
-    todo_commands.insert("/show","Afficher les éléments de la liste");
-    todo_commands.insert("/edit", "Permet d'éditer une liste");
-    todo_commands.insert("/exit","Quitter le gestionnaire de liste");
 
     let mut ctx = Context {
         memory: String::new(),
@@ -47,6 +40,7 @@ pub fn spark_bot() {
             Command::Todo => todo::handle_todo(&mut ctx.todo_list), //Gérer une liste de tâches
             Command::Remind => remind::handle_remind(&mut ctx, input.as_str()), //Créer un rappel pour une certaine durée
             Command::Help => help::handle_help(), //Afficher la liste des commandes
+            Command::Weather => weather::handle_weather(), //Afficher la météo d'une ville
             Command::Exit => { // Quitter la conversation avec Spark
                 println!("À bientôt !");
                 break;

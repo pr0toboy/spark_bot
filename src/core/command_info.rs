@@ -36,8 +36,8 @@ pub struct CommandInfo {
     pub description: &'static str,
 }
 
-pub fn all_commands() -> Vec<CommandInfo> {
-    vec![
+pub fn all_commands() -> &'static [CommandInfo] {
+    &[
         CommandInfo { name: "/start",    command: Command::Start,    description: "Démarrer une nouvelle tâche" },
         CommandInfo { name: "/remember", command: Command::Remember, description: "Mémoriser une information" },
         CommandInfo { name: "/recall",   command: Command::Recall,   description: "Afficher ce que Spark a mémorisé" },
@@ -47,7 +47,7 @@ pub fn all_commands() -> Vec<CommandInfo> {
         CommandInfo { name: "/localize", command: Command::Localize, description: "Me localiser dans le monde (IP)" },
         CommandInfo { name: "/todo",     command: Command::Todo,     description: "Gérer une liste de tâches" },
         CommandInfo { name: "/remind",   command: Command::Remind,   description: "Créer un rappel pour une certaine durée" },
-        CommandInfo { name: "/weather",  command: Command::Weather,   description: "Affiche la météo d'une ville" },
+        CommandInfo { name: "/weather",  command: Command::Weather,  description: "Affiche la météo d'une ville" },
     ]
 }
 

@@ -1,4 +1,4 @@
-// commands/recall.rs
+// commands/remember.rs
 
 ///Mémoriser une information
 
