@@ -2,9 +2,20 @@
 
 /// Centralise les structures et contextes nécessaires pour le bot et ses commandes
 
-use std::time::{Duration, SystemTime};
-use std::sync::{Arc, Mutex};
+use serde::Deserialize;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime};
+
+#[derive(Deserialize, Debug)]
+pub struct Location {
+    pub city: Option<String>,
+    pub region: Option<String>,
+    pub country: Option<String>,
+    pub loc: Option<String>, // latitude,longitude
+    pub ip: Option<String>,
+    pub org: Option<String>,
+}
 
 /// Structure pour la commande /remind
 pub struct Reminder {

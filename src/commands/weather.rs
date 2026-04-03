@@ -1,45 +1,10 @@
 // commands/weather.rs
 
-// Affiche la météo d'une ville
+use crate::commands::localize::handle_localize;
 
-<<<<<<< Updated upstream
 pub fn handle_weather() {
-    println!("⛅ Commande /weather non encore implémentée.");
-}
-=======
-// structure des informations à donner à l'utilisateur
-#[derive(Deserialize, Debug)]
-struct Meteo {
-    city: Option<String>,
-    weather: Option<String>,
-    wind: Option<String>,
-    temperature: Option<String>,
-    barometer: Option<String>,
-}
-
-//fonction handle
-pub fn handle_weather() {
-    println!("🔍 Analyse de la météo en cours...");
-
-    //récupère les informations de localisation depuis le site "https://ipinfo.io/json"
-    let response = get("");
-    match response {
-        Ok(resp) => {
-            let location: Result<Location, _> = resp.json();
-            match location {
-                Ok(loc) => {
-                    println!("🌍 IP : {}", loc.ip.unwrap_or("Inconnue".to_string()));
-                    println!("📍 Ville : {}", loc.city.unwrap_or("Inconnue".to_string()));
-                    println!("🗺️ Région : {}", loc.region.unwrap_or("Inconnue".to_string()));
-                    println!("🇺🇳 Pays : {}", loc.country.unwrap_or("Inconnu".to_string()));
-                    println!("🛰️ Coordonnées : {}", loc.loc.unwrap_or("Inconnues".to_string()));
-                    println!("🏢 Fournisseur : {}", loc.org.unwrap_or("Inconnu".to_string()));
-                }
-                Err(_) => println!("Erreur de lecture des données JSON."),
-            }
-        }
-        Err(_) => println!("Erreur de connexion à l’API."),
-    }
+    println!("⛅ Météo en cours...");
+    handle_localize();
 }
 
 fn wc_emoji(code: i32) -> (&'static str, &'static str) {
@@ -64,4 +29,3 @@ fn wc_emoji(code: i32) -> (&'static str, &'static str) {
         _ => ("❓", "Inconnu"),
     }
 }
->>>>>>> Stashed changes

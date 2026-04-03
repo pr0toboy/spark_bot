@@ -1,26 +1,11 @@
 // commands/localize.rs
 
-/// Me localiser dans le monde (IP)
-
+use crate::core::structures::Location;
 use reqwest::blocking::get;
-use serde::Deserialize;
 
-// structure des informations à donner à l'utilisateur
-#[derive(Deserialize, Debug)]
-struct Location {
-    city: Option<String>,
-    region: Option<String>,
-    country: Option<String>,
-    loc: Option<String>, // latitude,longitude
-    ip: Option<String>,
-    org: Option<String>,
-}
-
-//fonction handle
 pub fn handle_localize() {
     println!("🔍 Localisation en cours...");
 
-    //récupère les informations de localisation depuis le site "https://ipinfo.io/json"
     let response = get("https://ipinfo.io/json");
     match response {
         Ok(resp) => {
@@ -37,6 +22,6 @@ pub fn handle_localize() {
                 Err(_) => println!("Erreur de lecture des données JSON."),
             }
         }
-        Err(_) => println!("Erreur de connexion à l’API."),
+        Err(_) => println!("Erreur de connexion à l'API."),
     }
 }

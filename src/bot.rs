@@ -13,6 +13,7 @@ use crate::commands::{
 };
 use crate::core::command_info::Command;
 use crate::core::structures::Context;
+use std::collections::HashMap;
 
 ///////////////////////////////////////////////////////////////////////
 
