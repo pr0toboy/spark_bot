@@ -1,5 +1,13 @@
-def handle(ctx, user_input: str) -> None:
-    print("Que dois-je me souvenir ?")
-    ctx.memory = input("› ").strip()
+from result import Result
+
+
+def handle(ctx, user_input: str) -> Result:
+    value = user_input.removeprefix("/remember").strip()
+    if not value:
+        print("Que dois-je me souvenir ?")
+        value = input("› ").strip()
+    if not value:
+        return Result.error("❌ Rien à mémoriser.")
+    ctx.memory = value
     ctx.save()
-    print("Ok, je m'en souviendrai !")
+    return Result.success(f"Ok, je me souviens : « {value} »")

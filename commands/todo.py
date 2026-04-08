@@ -1,4 +1,7 @@
-def handle(ctx, user_input: str) -> None:
+from result import Result
+
+
+def handle(ctx, user_input: str) -> Result:
     print("📒 Gestionnaire de listes")
     _show_lists(ctx.todo_list)
     while True:
@@ -12,10 +15,10 @@ def handle(ctx, user_input: str) -> None:
         elif cmd == "/remove":
             _remove_list(ctx)
         elif cmd == "/exit":
-            print("Fin du gestionnaire.")
             break
         else:
             print("Commandes : /new, /show, /edit, /remove, /exit")
+    return Result.success()
 
 
 def _show_lists(todo_list: dict) -> None:

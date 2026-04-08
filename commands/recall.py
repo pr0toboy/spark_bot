@@ -1,5 +1,7 @@
-def handle(ctx, user_input: str) -> None:
+from result import Result
+
+
+def handle(ctx, user_input: str) -> Result:
     if ctx.memory:
-        print(f"Je me souviens de : {ctx.memory}")
-    else:
-        print("Je n'ai rien en mémoire.")
+        return Result.success(f"Je me souviens de : {ctx.memory}")
+    return Result.success("Je n'ai rien en mémoire.")

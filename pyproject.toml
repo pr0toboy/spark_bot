@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spark-bot"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic",
+    "requests",
+]
+
+[tool.setuptools]
+py-modules = ["main", "bot", "context", "result"]
+packages = ["commands"]
+
+[project.scripts]
+spark = "main:main"

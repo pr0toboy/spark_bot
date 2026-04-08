@@ -1,7 +1,7 @@
 from context import Context
 from commands import (
     start, help as help_cmd, remember, recall,
-    todo, remind, pomodoro, localize, weather, ask,
+    todo, remind, pomodoro, localize, weather, ask, log, note, quote,
 )
 
 
@@ -19,10 +19,14 @@ class SparkBot:
             "/localize": localize.handle,
             "/weather":  weather.handle,
             "/ask":      ask.handle,
+            "/log":      log.handle,
+            "/note":     note.handle,
+            "/quote":    quote.handle,
         }
 
     def run(self):
-        print("Salut, je suis Spark. Tape /help ou /exit.")
+        greeting = f"Content de te revoir, {self.ctx.name} !" if self.ctx.name else "Salut, je suis Spark !"
+        print(f"{greeting} Tape /help ou /exit.")
         while True:
             user_input = input("› ").strip()
             if not user_input:
@@ -34,6 +38,9 @@ class SparkBot:
             cmd = user_input.split()[0]
             handler = self.commands.get(cmd)
             if handler:
-                handler(self.ctx, user_input)
+                result = handler(self.ctx, user_input)
+                log.add_entry(cmd, user_input.removeprefix(cmd).strip())
+                if result and result.message:
+                    print(result.message)
             else:
                 print("Commande inconnue. Tape /help.")

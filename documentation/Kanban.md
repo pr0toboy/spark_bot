@@ -1,14 +1,9 @@
 # Kanban
 
 ## À faire
-### Améliorations
-- Faire retourner des Results aux commandes à la place d'un simple print
-- /start : message de bienvenue et configuration initiale
-- Faire les tests unitaires
-
 ### Nouveautés
-- /log : Journalisation des actions (log des tâches effectuées)
-- Base de données SQLite
+- /translate : traduction rapide d'un mot ou d'une phrase (via API LibreTranslate ou DeepL)
+- /define : définition d'un mot (via dictionnaire en ligne)
 
 
 
@@ -22,27 +17,30 @@ ________________________________________________________________________________
 
 
 
-
 ________________________________________________________________________________________________________________________
 
 ## Terminé
 ### Commandes
 - /help : liste des commandes disponibles
-- /remember : Spark retient une info pour plus tard (ex : /remember mon code vwifi est 1234)
+- /start : message de bienvenue + configuration initiale (nom de l'utilisateur)
+- /remember : Spark retient une info (inline ou interactif)
 - /recall : retrouve une info mémorisée
 - /pomodoro
-- /localize : détecte ton emplacement (via IP ou config) et te donne des infos locales
+- /localize : détecte ton emplacement (via IP)
 - /todo : gérer une liste de tâches (ajouter, supprimer, lister)
-- /remind : créer un rappel (ex : /remind 10min boire de l’eau)
+- /remind : créer un rappel
+- /weather : météo actuelle via Open-Meteo
+- /ask : poser une question à Claude (historique persisté)
+- /log : journal des actions (auto-log, filtrage, clear)
+- /note : enregistrer une note rapide (inline, interactif, list, delete)
+- /quote : citation inspirante (API ZenQuotes + fallback local)
 
 ### Améliorations
 - Séparation en modules
 - Liste des commandes à un seul endroit
 - /remove list dans todo
 - Améliorer les threads
-    - Si le programme principal se termine, les threads ne seront pas terminés proprement.
-
-
-
-
-
+- Commandes retournent des Result au lieu de print
+- Base de données SQLite (remplace JSON) + tables logs + notes
+- /remember supporte le mode inline et interactif
+- Context enrichi : champ `name` persisté en base
