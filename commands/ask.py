@@ -1,18 +1,46 @@
+import os
 import anthropic
+import groq as groq_sdk
 from pathlib import Path
 from result import Result
+from commands.model import DEFAULT_ANTHROPIC, DEFAULT_GROQ
 
 _SPARK_MD = Path(__file__).parent.parent / "SPARK.md"
 
 
-def _get_client(ctx):
-    api_key = ctx.api_key
-    if not api_key:
-        import os
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        raise ValueError("Aucune clé API. Lance /login pour en enregistrer une.")
-    return anthropic.Anthropic(api_key=api_key)
+def _resolve_provider(ctx):
+    """Return (provider, api_key) or raise ValueError."""
+    if ctx.api_key or os.environ.get("ANTHROPIC_API_KEY"):
+        return "anthropic", ctx.api_key or os.environ["ANTHROPIC_API_KEY"]
+    if ctx.groq_api_key or os.environ.get("GROQ_API_KEY"):
+        return "groq", ctx.groq_api_key or os.environ["GROQ_API_KEY"]
+    raise ValueError("Aucune clé API. Lance /login anthropic ou /login groq.")
+
+
+def _chat(ctx, system: str, messages: list, max_tokens: int = 1024) -> str:
+    provider, api_key = _resolve_provider(ctx)
+
+    if provider == "anthropic":
+        model = ctx.anthropic_model or DEFAULT_ANTHROPIC
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            system=system,
+            messages=messages,
+        )
+        return response.content[0].text
+
+    else:  # groq
+        model = ctx.groq_model or DEFAULT_GROQ
+        client = groq_sdk.Groq(api_key=api_key)
+        groq_messages = [{"role": "system", "content": system}] + messages
+        response = client.chat.completions.create(
+            model=model,
+            max_tokens=max_tokens,
+            messages=groq_messages,
+        )
+        return response.choices[0].message.content
 
 
 def handle(ctx, user_input: str) -> Result:
@@ -46,19 +74,11 @@ def handle(ctx, user_input: str) -> Result:
     ctx.chat_history.append({"role": "user", "content": msg})
 
     try:
-        client = _get_client(ctx)
+        reply = _chat(ctx, system, ctx.chat_history)
     except ValueError as e:
         ctx.chat_history.pop()
         return Result.error(str(e))
 
-    response = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=1024,
-        system=system,
-        messages=ctx.chat_history,
-    )
-
-    reply = response.content[0].text
     ctx.chat_history.append({"role": "assistant", "content": reply})
     ctx.save()
     return Result.success(f"Spark : {reply}")
@@ -88,20 +108,15 @@ def _compact(ctx) -> Result:
         f"{e['role']}: {e['content']}" for e in ctx.chat_history
     )
     try:
-        client = _get_client(ctx)
+        summary = _chat(
+            ctx,
+            "Tu es un assistant qui résume des conversations de manière concise.",
+            [{"role": "user", "content": f"Résume cette conversation en quelques phrases :\n\n{history_text}"}],
+            max_tokens=512,
+        )
     except ValueError as e:
         return Result.error(str(e))
 
-    response = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=512,
-        system="Tu es un assistant qui résume des conversations de manière concise.",
-        messages=[{
-            "role": "user",
-            "content": f"Résume cette conversation en quelques phrases :\n\n{history_text}"
-        }],
-    )
-    summary = response.content[0].text
     ctx.chat_history = [{"role": "assistant", "content": f"[Résumé] {summary}"}]
     ctx.save()
     return Result.success(f"Historique compacté :\n{summary}")
