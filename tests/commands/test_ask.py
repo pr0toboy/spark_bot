@@ -3,17 +3,9 @@ from context import Context
 from commands import ask
 
 
-def make_mock_response(text: str):
-    mock = MagicMock()
-    mock.content = [MagicMock(text=text)]
-    return mock
-
-
 def test_ask_sends_message_and_stores_history():
     ctx = Context()
-    mock_client = MagicMock()
-    mock_client.messages.create.return_value = make_mock_response("Voici ma réponse.")
-    with patch("anthropic.Anthropic", return_value=mock_client):
+    with patch("commands.ask._chat", return_value="Voici ma réponse."):
         with patch.object(ctx, "save"):
             result = ask.handle(ctx, "/ask Quelle est la météo ?")
     assert len(ctx.chat_history) == 2
@@ -25,14 +17,18 @@ def test_ask_sends_message_and_stores_history():
 
 def test_ask_includes_spark_context_in_system():
     ctx = Context(memory="je m'appelle Alexis", todo_list={"travail": ["PR review"]})
-    mock_client = MagicMock()
-    mock_client.messages.create.return_value = make_mock_response("OK")
-    with patch("anthropic.Anthropic", return_value=mock_client):
+    captured = {}
+
+    def capture(ctx, system, messages, **kwargs):
+        captured["system"] = system
+        return "OK"
+
+    with patch("commands.ask._chat", side_effect=capture):
         with patch.object(ctx, "save"):
             ask.handle(ctx, "/ask test")
-    call_kwargs = mock_client.messages.create.call_args.kwargs
-    assert "je m'appelle Alexis" in call_kwargs["system"]
-    assert "PR review" in call_kwargs["system"]
+
+    assert "je m'appelle Alexis" in captured["system"]
+    assert "PR review" in captured["system"]
 
 
 def test_ask_empty_message():
@@ -45,9 +41,7 @@ def test_ask_empty_message():
 
 def test_ask_saves_context():
     ctx = Context()
-    mock_client = MagicMock()
-    mock_client.messages.create.return_value = make_mock_response("OK")
-    with patch("anthropic.Anthropic", return_value=mock_client):
+    with patch("commands.ask._chat", return_value="OK"):
         with patch.object(ctx, "save") as mock_save:
             ask.handle(ctx, "/ask test")
     mock_save.assert_called_once()
@@ -89,9 +83,7 @@ def test_ask_compact():
         {"role": "user", "content": "Parle-moi de Python"},
         {"role": "assistant", "content": "Python est un langage interprété."},
     ]
-    mock_client = MagicMock()
-    mock_client.messages.create.return_value = make_mock_response("Conversation sur Python.")
-    with patch("anthropic.Anthropic", return_value=mock_client):
+    with patch("commands.ask._chat", return_value="Conversation sur Python."):
         with patch.object(ctx, "save"):
             result = ask.handle(ctx, "/ask compact")
     assert result.ok
