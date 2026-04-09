@@ -1,18 +1,20 @@
 from result import Result
 
 COMMANDS = [
-    ("/start",    "Démarrer une nouvelle tâche"),
+    ("/start",    "Démarrer une nouvelle session"),
+    ("/ask",      "Poser une question à l'IA  (history | clear | compact | edit)"),
     ("/remember", "Mémoriser une information"),
     ("/recall",   "Afficher ce que Spark a mémorisé"),
     ("/todo",     "Gérer une liste de tâches"),
     ("/remind",   "Créer un rappel  (ex: /remind boire, 10min)"),
+    ("/note",     "Enregistrer une note  (ex: /note <texte> | list | delete <id>)"),
+    ("/log",      "Journal des actions  (ex: /log | /log clear | /log /remind)"),
+    ("/login",    "Enregistrer une clé API  (anthropic | groq)"),
+    ("/model",    "Choisir le modèle IA  (list | anthropic <m> | groq <m>)"),
     ("/pomodoro", "Lancer un minuteur Pomodoro (4 cycles 25min/5min)"),
     ("/localize", "Me localiser dans le monde (IP)"),
     ("/weather",  "Afficher la météo actuelle"),
-    ("/ask",      "Poser une question à l'IA"),
-    ("/note",     "Enregistrer une note  (ex: /note <texte>, /note list, /note delete <id>)"),
     ("/quote",    "Afficher une citation inspirante"),
-    ("/log",      "Voir le journal des actions  (ex: /log, /log clear, /log /remind)"),
     ("/help",     "Afficher cette aide"),
     ("/exit",     "Quitter Spark"),
 ]

@@ -3,6 +3,36 @@ from commands import (
     start, help as help_cmd, remember, recall,
     todo, remind, pomodoro, localize, weather, ask, log, note, quote, login, model,
 )
+from commands.help import COMMANDS
+
+from prompt_toolkit import PromptSession
+from prompt_toolkit.completion import Completer, Completion
+from prompt_toolkit.styles import Style
+
+
+_STYLE = Style.from_dict({
+    "prompt":      "ansigreen bold",
+    "completion-menu.completion": "bg:#1e1e1e #ffffff",
+    "completion-menu.completion.current": "bg:#0066cc #ffffff bold",
+})
+
+
+class _CommandCompleter(Completer):
+    def __init__(self, commands: list[tuple[str, str]]):
+        self._commands = commands
+
+    def get_completions(self, document, complete_event):
+        text = document.text_before_cursor
+        if not text.startswith("/"):
+            return
+        for cmd, desc in self._commands:
+            if cmd.startswith(text):
+                yield Completion(
+                    cmd,
+                    start_position=-len(text),
+                    display=cmd,
+                    display_meta=desc,
+                )
 
 
 class SparkBot:
@@ -25,12 +55,22 @@ class SparkBot:
             "/login":    login.handle,
             "/model":    model.handle,
         }
+        self._session = PromptSession(
+            completer=_CommandCompleter(COMMANDS),
+            style=_STYLE,
+            complete_while_typing=True,
+        )
 
     def run(self):
         greeting = f"Content de te revoir, {self.ctx.name} !" if self.ctx.name else "Salut, je suis Spark !"
         print(f"{greeting} Tape /help ou /exit.")
         while True:
-            user_input = input("› ").strip()
+            try:
+                user_input = self._session.prompt("› ").strip()
+            except (EOFError, KeyboardInterrupt):
+                self.ctx.save()
+                print("\nÀ bientôt !")
+                break
             if not user_input:
                 continue
             if user_input == "/exit":
