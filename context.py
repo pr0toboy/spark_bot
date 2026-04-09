@@ -37,6 +37,7 @@ class Context:
     memory: str = ""
     todo_list: dict = field(default_factory=dict)
     chat_history: list = field(default_factory=list)
+    api_key: str = ""
 
     def save(self, db_path: Path = DB_PATH) -> None:
         conn = get_conn(db_path)
@@ -45,6 +46,7 @@ class Context:
             ("memory", self.memory),
             ("todo_list", json.dumps(self.todo_list, ensure_ascii=False)),
             ("chat_history", json.dumps(self.chat_history, ensure_ascii=False)),
+            ("api_key", self.api_key),
         ]
         conn.executemany(
             "INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)", rows
@@ -62,4 +64,5 @@ class Context:
             memory=rows.get("memory", ""),
             todo_list=json.loads(rows.get("todo_list", "{}")),
             chat_history=json.loads(rows.get("chat_history", "[]")),
+            api_key=rows.get("api_key", ""),
         )

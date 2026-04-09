@@ -3,7 +3,16 @@ from pathlib import Path
 from result import Result
 
 _SPARK_MD = Path(__file__).parent.parent / "SPARK.md"
-_client = anthropic.Anthropic()
+
+
+def _get_client(ctx):
+    api_key = ctx.api_key
+    if not api_key:
+        import os
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise ValueError("Aucune clé API. Lance /login pour en enregistrer une.")
+    return anthropic.Anthropic(api_key=api_key)
 
 
 def handle(ctx, user_input: str) -> Result:
@@ -36,7 +45,13 @@ def handle(ctx, user_input: str) -> Result:
 
     ctx.chat_history.append({"role": "user", "content": msg})
 
-    response = _client.messages.create(
+    try:
+        client = _get_client(ctx)
+    except ValueError as e:
+        ctx.chat_history.pop()
+        return Result.error(str(e))
+
+    response = client.messages.create(
         model="claude-opus-4-6",
         max_tokens=1024,
         system=system,
@@ -72,7 +87,12 @@ def _compact(ctx) -> Result:
     history_text = "\n".join(
         f"{e['role']}: {e['content']}" for e in ctx.chat_history
     )
-    response = _client.messages.create(
+    try:
+        client = _get_client(ctx)
+    except ValueError as e:
+        return Result.error(str(e))
+
+    response = client.messages.create(
         model="claude-opus-4-6",
         max_tokens=512,
         system="Tu es un assistant qui résume des conversations de manière concise.",

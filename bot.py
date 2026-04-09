@@ -1,7 +1,7 @@
 from context import Context
 from commands import (
     start, help as help_cmd, remember, recall,
-    todo, remind, pomodoro, localize, weather, ask, log, note, quote,
+    todo, remind, pomodoro, localize, weather, ask, log, note, quote, login,
 )
 
 
@@ -22,6 +22,7 @@ class SparkBot:
             "/log":      log.handle,
             "/note":     note.handle,
             "/quote":    quote.handle,
+            "/login":    login.handle,
         }
 
     def run(self):

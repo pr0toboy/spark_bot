@@ -13,8 +13,11 @@ venv/
 # Environnement
 .env
 
-# Données locales
+# Données locales (contient la clé API — ne jamais committer)
 data/
+
+# Personnalisation locale de l'IA
+SPARK.md
 
 # Tests
 .pytest_cache/
