@@ -10,6 +10,7 @@ _SPARK_MD = Path(__file__).parent.parent / "SPARK.md"
 _HISTORY_WINDOW = 10   # messages envoyés au modèle (hors résumé)
 _MAX_TOKENS = 1024
 _MAX_TOKENS_VAULT = 2048
+_spark_md_cache: tuple[float, str] | None = None  # (mtime, content)
 
 _VAULT_TOOLS_ANTHROPIC = [
     {
@@ -123,12 +124,21 @@ def _resolve_provider(ctx):
 
 
 def _trim(history: list) -> list:
-    """Renvoie les N derniers messages pour limiter les tokens envoyés."""
     return history[-_HISTORY_WINDOW:]
 
 
+def _read_spark_md() -> str:
+    global _spark_md_cache
+    if _SPARK_MD.exists():
+        mtime = _SPARK_MD.stat().st_mtime
+        if _spark_md_cache is None or _spark_md_cache[0] != mtime:
+            _spark_md_cache = (mtime, _SPARK_MD.read_text())
+        return _spark_md_cache[1]
+    return "Tu es Spark, un assistant CLI."
+
+
 def _build_system(ctx, vault_active: bool) -> str:
-    base = _SPARK_MD.read_text() if _SPARK_MD.exists() else "Tu es Spark, un assistant CLI."
+    base = _read_spark_md()
     parts = []
     if ctx.memory:
         parts.append(f"Mémoire : {ctx.memory}")

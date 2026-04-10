@@ -9,10 +9,6 @@ REGISTRY = {
 }
 
 
-def _is_enabled(ctx, name: str) -> bool:
-    return ctx.tools_enabled.get(name, False)
-
-
 def handle(ctx, user_input: str) -> Result:
     sub = user_input.removeprefix("/tools").strip()
 
@@ -33,7 +29,7 @@ def handle(ctx, user_input: str) -> Result:
 def _list(ctx) -> Result:
     lines = ["🛠️  Outils disponibles :"]
     for name, info in REGISTRY.items():
-        status = "✅ activé" if _is_enabled(ctx, name) else "⭕ désactivé"
+        status = "✅ activé" if ctx.tools_enabled.get(name, False) else "⭕ désactivé"
         lines.append(f"  {name:<12} {status}  — {info['description']}")
     return Result.success("\n".join(lines))
 
@@ -43,7 +39,7 @@ def _enable(ctx, name: str) -> Result:
         return Result.error(f"Outil inconnu : {name}. Disponibles : {', '.join(REGISTRY)}")
 
     info = REGISTRY[name]
-    if info.get("requires") and not getattr(ctx, info["requires"], ""):
+    if info.get("requires") and not getattr(ctx, info["requires"], None):
         return Result.error(f"❌ {info['requires_msg']}")
 
     ctx.tools_enabled[name] = True

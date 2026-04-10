@@ -98,6 +98,7 @@ def _export(ctx, db_path: Path = DB_PATH) -> Result:
     if not rows:
         return Result.success("📭 Aucune note à exporter.")
 
+    Path(ctx.vault_path).expanduser().mkdir(parents=True, exist_ok=True)
     for note_id, timestamp, content in rows:
         _write_vault_note(ctx.vault_path, note_id, timestamp, content)
 
