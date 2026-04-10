@@ -100,6 +100,53 @@ def test_bad_usage():
     assert "Usage" in result.message
 
 
+def test_presets_list():
+    ctx = Context()
+    result = skills.handle(ctx, "/skills presets")
+    assert result.ok
+    assert "superpower" in result.message
+
+
+def test_add_superpower_preset():
+    ctx = Context()
+    with patch.object(ctx, "save"):
+        result = skills.handle(ctx, "/skills add superpower")
+    assert result.ok
+    assert "superpower" in ctx.skills
+    assert ctx.skills["superpower"] == skills.PRESETS["superpower"]
+    assert "(preset)" in result.message
+
+
+def test_add_superpower_custom_overrides_preset():
+    ctx = Context()
+    with patch.object(ctx, "save"):
+        skills.handle(ctx, "/skills add superpower instruction custom")
+    assert ctx.skills["superpower"] == "instruction custom"
+
+
+def test_list_shows_preset_tag():
+    ctx = Context(skills={"superpower": skills.PRESETS["superpower"]})
+    result = skills.handle(ctx, "/skills list")
+    assert "[preset]" in result.message
+
+
+def test_superpower_injected_in_ai():
+    from commands import ai
+    ctx = Context(skills={"superpower": skills.PRESETS["superpower"]})
+    captured = {}
+
+    def capture(ctx, system, messages, **kwargs):
+        captured["system"] = system
+        return "OK"
+
+    with patch("commands.ai._chat", side_effect=capture):
+        with patch.object(ctx, "save"):
+            ai.handle(ctx, "/ai bonjour")
+
+    assert "[superpower]" in captured["system"]
+    assert "Superpower" in captured["system"]
+
+
 def test_save_called_on_add():
     ctx = Context()
     with patch.object(ctx, "save") as mock_save:
