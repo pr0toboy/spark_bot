@@ -7,6 +7,9 @@ from result import Result
 from commands.model import DEFAULT_ANTHROPIC, DEFAULT_GROQ
 
 _SPARK_MD = Path(__file__).parent.parent / "SPARK.md"
+_HISTORY_WINDOW = 10   # messages envoyés au modèle (hors résumé)
+_MAX_TOKENS = 1024
+_MAX_TOKENS_VAULT = 2048
 
 _VAULT_TOOLS_ANTHROPIC = [
     {
@@ -119,7 +122,27 @@ def _resolve_provider(ctx):
     raise ValueError("Aucune clé API. Lance /login anthropic ou /login groq.")
 
 
-def _chat(ctx, system: str, messages: list, max_tokens: int = 1024) -> str:
+def _trim(history: list) -> list:
+    """Renvoie les N derniers messages pour limiter les tokens envoyés."""
+    return history[-_HISTORY_WINDOW:]
+
+
+def _build_system(ctx, vault_active: bool) -> str:
+    base = _SPARK_MD.read_text() if _SPARK_MD.exists() else "Tu es Spark, un assistant CLI."
+    parts = []
+    if ctx.memory:
+        parts.append(f"Mémoire : {ctx.memory}")
+    if ctx.todo_list:
+        parts.append(f"Todos : {ctx.todo_list}")
+    if vault_active:
+        parts.append("Vault Obsidian actif. Tu peux lister, lire et modifier les notes.")
+    if ctx.skills:
+        skills_lines = "\n".join(f"[{n}] : {i}" for n, i in ctx.skills.items())
+        parts.append(f"Skills actifs :\n{skills_lines}")
+    return base + ("\n\nContexte :\n" + "\n".join(parts) if parts else "")
+
+
+def _chat(ctx, system: str, messages: list, max_tokens: int = _MAX_TOKENS) -> str:
     provider, api_key = _resolve_provider(ctx)
 
     if provider == "anthropic":
@@ -151,13 +174,13 @@ def _chat_with_vault(ctx, system: str, messages: list, vault_path: str) -> tuple
 def _anthropic_vault_loop(ctx, api_key, system, messages, vault_path) -> tuple[str, list[str]]:
     model = ctx.anthropic_model or DEFAULT_ANTHROPIC
     client = anthropic.Anthropic(api_key=api_key)
-    history = list(messages)
+    history = _trim(messages)
     actions = []
     reply = ""
 
     while True:
         response = client.messages.create(
-            model=model, max_tokens=2048, system=system,
+            model=model, max_tokens=_MAX_TOKENS_VAULT, system=system,
             messages=history, tools=_VAULT_TOOLS_ANTHROPIC,
         )
 
@@ -189,13 +212,13 @@ def _anthropic_vault_loop(ctx, api_key, system, messages, vault_path) -> tuple[s
 def _groq_vault_loop(ctx, api_key, system, messages, vault_path) -> tuple[str, list[str]]:
     model = ctx.groq_model or DEFAULT_GROQ
     client = groq_sdk.Groq(api_key=api_key)
-    history = [{"role": "system", "content": system}] + list(messages)
+    history = [{"role": "system", "content": system}] + _trim(messages)
     actions = []
     reply = ""
 
     while True:
         response = client.chat.completions.create(
-            model=model, max_tokens=2048, messages=history,
+            model=model, max_tokens=_MAX_TOKENS_VAULT, messages=history,
             tools=_VAULT_TOOLS_GROQ, tool_choice="auto",
         )
         msg = response.choices[0].message
@@ -239,24 +262,8 @@ def handle(ctx, user_input: str) -> Result:
             "        /ai edit      — modifier SPARK.md"
         )
 
-    base_system = _SPARK_MD.read_text() if _SPARK_MD.exists() else "Tu es Spark, un assistant CLI."
-    spark_context = (
-        f"\n\nContexte utilisateur :\n"
-        f"Mémoire : {ctx.memory or 'vide'}\n"
-        f"Todos : {ctx.todo_list or 'aucun'}"
-    )
-    vault_active = ctx.vault_path and ctx.tools_enabled.get("obsidian", False)
-    if vault_active:
-        spark_context += (
-            f"\nVault Obsidian : {ctx.vault_path}\n"
-            "Tu peux lister, lire et modifier les notes du vault avec les outils disponibles."
-        )
-    if ctx.skills:
-        skills_block = "\n\nSkills actifs :\n" + "\n".join(
-            f"[{name}] : {instructions}" for name, instructions in ctx.skills.items()
-        )
-        spark_context += skills_block
-    system = base_system + spark_context
+    vault_active = bool(ctx.vault_path and ctx.tools_enabled.get("obsidian", False))
+    system = _build_system(ctx, vault_active)
 
     ctx.chat_history.append({"role": "user", "content": msg})
 
@@ -264,7 +271,7 @@ def handle(ctx, user_input: str) -> Result:
         if vault_active:
             reply, actions = _chat_with_vault(ctx, system, ctx.chat_history, ctx.vault_path)
         else:
-            reply = _chat(ctx, system, ctx.chat_history)
+            reply = _chat(ctx, system, _trim(ctx.chat_history))
             actions = []
     except ValueError as e:
         ctx.chat_history.pop()

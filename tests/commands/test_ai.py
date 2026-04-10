@@ -122,8 +122,8 @@ def test_vault_context_injected_in_system(tmp_path):
         with patch.object(ctx, "save"):
             ai.handle(ctx, "/ai test vault")
 
-    assert str(tmp_path) in captured["system"]
     assert "vault" in captured["system"].lower()
+    assert "notes" in captured["system"].lower()
 
 
 def test_vault_chat_used_when_vault_and_tool_enabled(tmp_path):
