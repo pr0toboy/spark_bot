@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     name: Build APK
@@ -24,6 +27,10 @@ jobs:
           flutter-version: '3.22.x'
           channel: stable
           cache: true
+
+      - name: Generate Flutter platform files
+        working-directory: flutter_app
+        run: flutter create --platforms android .
 
       - name: Flutter pub get
         working-directory: flutter_app
