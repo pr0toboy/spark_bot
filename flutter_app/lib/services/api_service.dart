@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../config.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/message.dart';
 import '../models/note.dart';
 import '../models/skill.dart';
+
+const String _kBaseUrlKey = 'server_url';
+const String kDefaultBaseUrl = 'http://localhost:8000';
 
 class ApiException implements Exception {
   final String message;
@@ -18,8 +21,22 @@ class ApiService {
   ApiService._();
 
   final _client = http.Client();
+  String _baseUrl = kDefaultBaseUrl;
 
-  Uri _url(String path) => Uri.parse('$kBaseUrl$path');
+  Future<void> init() async {
+    final prefs = await SharedPreferences.getInstance();
+    _baseUrl = prefs.getString(_kBaseUrlKey) ?? kDefaultBaseUrl;
+  }
+
+  Future<void> setBaseUrl(String url) async {
+    _baseUrl = url.trimRight().replaceAll(RegExp(r'/$'), '');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kBaseUrlKey, _baseUrl);
+  }
+
+  String get baseUrl => _baseUrl;
+
+  Uri _url(String path) => Uri.parse('$_baseUrl$path');
 
   Future<Map<String, dynamic>> _get(String path) async {
     final res = await _client.get(_url(path));

@@ -122,6 +122,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _setServerUrl() async {
+    final controller = TextEditingController(text: _api.baseUrl);
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('URL du serveur'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.url,
+            decoration: const InputDecoration(hintText: 'http://192.168.x.x:8000'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Enregistrer')),
+          ],
+        ),
+      );
+      if (confirmed != true || controller.text.trim().isEmpty) return;
+      await _api.setBaseUrl(controller.text.trim());
+      await _load();
+    } finally {
+      controller.dispose();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -131,6 +157,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          _section('Connexion', [
+            ListTile(
+              title: const Text('URL du serveur'),
+              subtitle: Text(_api.baseUrl),
+              trailing: TextButton(onPressed: _setServerUrl, child: const Text('Modifier')),
+            ),
+          ]),
           _section('Clés API', [
             _keyTile('Anthropic', _settings['has_anthropic_key'] == true),
             _keyTile('Groq', _settings['has_groq_key'] == true),

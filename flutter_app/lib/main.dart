@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'screens/chat_screen.dart';
 import 'screens/notes_screen.dart';
 import 'screens/settings_screen.dart';
+import 'services/api_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await ApiService().init();
   runApp(const SparkApp());
 }
 
