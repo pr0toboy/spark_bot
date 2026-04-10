@@ -251,6 +251,11 @@ def handle(ctx, user_input: str) -> Result:
             f"\nVault Obsidian : {ctx.vault_path}\n"
             "Tu peux lister, lire et modifier les notes du vault avec les outils disponibles."
         )
+    if ctx.skills:
+        skills_block = "\n\nSkills actifs :\n" + "\n".join(
+            f"[{name}] : {instructions}" for name, instructions in ctx.skills.items()
+        )
+        spark_context += skills_block
     system = base_system + spark_context
 
     ctx.chat_history.append({"role": "user", "content": msg})

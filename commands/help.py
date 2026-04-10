@@ -12,6 +12,7 @@ COMMANDS = [
     ("/login",    "Enregistrer une clé API  (anthropic | groq)"),
     ("/model",    "Choisir le modèle IA  (list | anthropic <m> | groq <m>)"),
     ("/tools",    "Activer/désactiver des outils  (list | enable <outil> | disable <outil>)"),
+    ("/skills",   "Gérer les skills de l'IA  (list | add <nom> | remove <nom> | show <nom>)"),
     ("/pomodoro", "Lancer un minuteur Pomodoro (4 cycles 25min/5min)"),
     ("/localize", "Me localiser dans le monde (IP)"),
     ("/weather",  "Afficher la météo actuelle"),
