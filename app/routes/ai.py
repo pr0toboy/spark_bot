@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from app.models import AiRequest, AiResponse
 from app.deps import load_ctx
-from commands import ai as ai_cmd
+from commands.ai import chat_api, handle as ai_handle
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -9,14 +9,11 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 @router.post("", response_model=AiResponse)
 def chat(req: AiRequest):
     ctx = load_ctx()
-    result = ai_cmd.handle(ctx, f"/ai {req.message}")
-    if not result.ok:
-        raise HTTPException(status_code=400, detail=result.message)
-
-    lines = result.message.splitlines()
-    actions = [l for l in lines if not l.startswith("Spark :")]
-    reply_lines = [l.removeprefix("Spark : ") for l in lines if l.startswith("Spark :")]
-    return AiResponse(reply="\n".join(reply_lines), actions=actions)
+    try:
+        reply, actions = chat_api(ctx, req.message)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return AiResponse(reply=reply, actions=actions)
 
 
 @router.get("/history")
@@ -36,7 +33,7 @@ def clear_history():
 @router.post("/compact")
 def compact():
     ctx = load_ctx()
-    result = ai_cmd.handle(ctx, "/ai compact")
+    result = ai_handle(ctx, "/ai compact")
     if not result.ok:
         raise HTTPException(status_code=400, detail=result.message)
     return {"message": result.message}

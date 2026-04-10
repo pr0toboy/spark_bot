@@ -1,9 +1,9 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Any
 
 
 class AiRequest(BaseModel):
-    message: str
+    message: str = Field(min_length=1)
 
 
 class AiResponse(BaseModel):
@@ -12,7 +12,7 @@ class AiResponse(BaseModel):
 
 
 class NoteCreate(BaseModel):
-    content: str
+    content: str = Field(min_length=1)
 
 
 class NoteItem(BaseModel):
@@ -34,8 +34,8 @@ class ToolItem(BaseModel):
 
 
 class SkillCreate(BaseModel):
-    name: str
-    instructions: str
+    name: str = Field(min_length=1)
+    instructions: str = Field(min_length=1)
 
 
 class SkillItem(BaseModel):

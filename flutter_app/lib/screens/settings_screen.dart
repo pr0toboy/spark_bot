@@ -53,63 +53,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _setApiKey(String provider) async {
     final controller = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('Clé API $provider'),
-        content: TextField(
-          controller: controller,
-          obscureText: true,
-          decoration: const InputDecoration(hintText: 'sk-…'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Enregistrer')),
-        ],
-      ),
-    );
-    if (confirmed != true || controller.text.trim().isEmpty) return;
     try {
-      final key = provider == 'anthropic' ? 'anthropic_api_key' : 'groq_api_key';
-      await _api.updateSettings({key: controller.text.trim()});
-      await _load();
-    } catch (e) {
-      _showError(e.toString());
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text('Clé API $provider'),
+          content: TextField(
+            controller: controller,
+            obscureText: true,
+            decoration: const InputDecoration(hintText: 'sk-…'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Enregistrer')),
+          ],
+        ),
+      );
+      if (confirmed != true || controller.text.trim().isEmpty) return;
+      try {
+        final key = provider == 'anthropic' ? 'anthropic_api_key' : 'groq_api_key';
+        await _api.updateSettings({key: controller.text.trim()});
+        await _load();
+      } catch (e) {
+        _showError(e.toString());
+      }
+    } finally {
+      controller.dispose();
     }
   }
 
   Future<void> _addSkill({Skill? preset}) async {
     final nameCtrl = TextEditingController(text: preset?.name ?? '');
     final instrCtrl = TextEditingController(text: preset?.instructions ?? '');
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(preset != null ? 'Ajouter le preset ${preset.name}' : 'Nouveau skill'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (preset == null)
-              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nom')),
-            const SizedBox(height: 8),
-            TextField(
-              controller: instrCtrl,
-              maxLines: 5,
-              decoration: const InputDecoration(labelText: 'Instructions'),
-            ),
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text(preset != null ? 'Ajouter le preset ${preset.name}' : 'Nouveau skill'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (preset == null)
+                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nom')),
+              const SizedBox(height: 8),
+              TextField(
+                controller: instrCtrl,
+                maxLines: 5,
+                decoration: const InputDecoration(labelText: 'Instructions'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Ajouter')),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Ajouter')),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      await _api.upsertSkill(nameCtrl.text.trim(), instrCtrl.text.trim());
-      await _load();
-    } catch (e) {
-      _showError(e.toString());
+      );
+      if (confirmed != true) return;
+      try {
+        await _api.upsertSkill(nameCtrl.text.trim(), instrCtrl.text.trim());
+        await _load();
+      } catch (e) {
+        _showError(e.toString());
+      }
+    } finally {
+      nameCtrl.dispose();
+      instrCtrl.dispose();
     }
   }
 

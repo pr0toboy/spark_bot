@@ -27,10 +27,10 @@ class ApiService {
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
-  Future<dynamic> _getList(String path) async {
+  Future<List<dynamic>> _getList(String path) async {
     final res = await _client.get(_url(path));
     _checkStatus(res);
-    return jsonDecode(res.body);
+    return jsonDecode(res.body) as List<dynamic>;
   }
 
   Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body) async {
@@ -81,7 +81,7 @@ class ApiService {
   // --- Notes ---
 
   Future<List<Note>> getNotes() async {
-    final list = await _getList('/api/notes') as List;
+    final list = await _getList('/api/notes');
     return list.map((e) => Note.fromJson(e as Map<String, dynamic>)).toList();
   }
 
@@ -100,7 +100,7 @@ class ApiService {
   // --- Tools ---
 
   Future<List<Map<String, dynamic>>> getTools() async {
-    final list = await _getList('/api/tools') as List;
+    final list = await _getList('/api/tools');
     return list.cast<Map<String, dynamic>>();
   }
 
@@ -110,12 +110,12 @@ class ApiService {
   // --- Skills ---
 
   Future<List<Skill>> getSkills() async {
-    final list = await _getList('/api/skills') as List;
+    final list = await _getList('/api/skills');
     return list.map((e) => Skill.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<List<Skill>> getPresets() async {
-    final list = await _getList('/api/skills/presets') as List;
+    final list = await _getList('/api/skills/presets');
     return list.map((e) => Skill.fromJson(e as Map<String, dynamic>)).toList();
   }
 
