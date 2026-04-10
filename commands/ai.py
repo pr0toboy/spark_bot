@@ -44,7 +44,7 @@ def _chat(ctx, system: str, messages: list, max_tokens: int = 1024) -> str:
 
 
 def handle(ctx, user_input: str) -> Result:
-    msg = user_input.removeprefix("/ask").strip()
+    msg = user_input.removeprefix("/ai").strip()
 
     if msg == "history":
         return _history(ctx)
@@ -56,11 +56,11 @@ def handle(ctx, user_input: str) -> Result:
         return _edit_spark_md()
     if not msg:
         return Result.error(
-            "Usage : /ask <question>\n"
-            "        /ask history   — afficher l'historique\n"
-            "        /ask clear     — vider l'historique\n"
-            "        /ask compact   — résumer et compacter l'historique\n"
-            "        /ask edit      — modifier SPARK.md"
+            "Usage : /ai <question>\n"
+            "        /ai history   — afficher l'historique\n"
+            "        /ai clear     — vider l'historique\n"
+            "        /ai compact   — résumer et compacter l'historique\n"
+            "        /ai edit      — modifier SPARK.md"
         )
 
     base_system = _SPARK_MD.read_text() if _SPARK_MD.exists() else "Tu es Spark, un assistant CLI."

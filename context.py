@@ -41,6 +41,7 @@ class Context:
     groq_api_key: str = ""
     anthropic_model: str = ""
     groq_model: str = ""
+    vault_path: str = ""
 
     def save(self, db_path: Path = DB_PATH) -> None:
         conn = get_conn(db_path)
@@ -53,6 +54,7 @@ class Context:
             ("groq_api_key", self.groq_api_key),
             ("anthropic_model", self.anthropic_model),
             ("groq_model", self.groq_model),
+            ("vault_path", self.vault_path),
         ]
         conn.executemany(
             "INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)", rows
@@ -74,4 +76,5 @@ class Context:
             groq_api_key=rows.get("groq_api_key", ""),
             anthropic_model=rows.get("anthropic_model", ""),
             groq_model=rows.get("groq_model", ""),
+            vault_path=rows.get("vault_path", ""),
         )

@@ -2,12 +2,12 @@ from result import Result
 
 COMMANDS = [
     ("/start",    "Démarrer une nouvelle session"),
-    ("/ask",      "Poser une question à l'IA  (history | clear | compact | edit)"),
+    ("/ai",       "Poser une question à l'IA  (history | clear | compact | edit)"),
     ("/remember", "Mémoriser une information"),
     ("/recall",   "Afficher ce que Spark a mémorisé"),
     ("/todo",     "Gérer une liste de tâches"),
     ("/remind",   "Créer un rappel  (ex: /remind boire, 10min)"),
-    ("/note",     "Enregistrer une note  (ex: /note <texte> | list | delete <id>)"),
+    ("/note",     "Enregistrer une note  (list | delete <id> | vault <path> | export)"),
     ("/log",      "Journal des actions  (ex: /log | /log clear | /log /remind)"),
     ("/login",    "Enregistrer une clé API  (anthropic | groq)"),
     ("/model",    "Choisir le modèle IA  (list | anthropic <m> | groq <m>)"),
