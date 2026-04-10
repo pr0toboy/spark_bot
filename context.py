@@ -42,6 +42,7 @@ class Context:
     anthropic_model: str = ""
     groq_model: str = ""
     vault_path: str = ""
+    tools_enabled: dict = field(default_factory=dict)
 
     def save(self, db_path: Path = DB_PATH) -> None:
         conn = get_conn(db_path)
@@ -55,6 +56,7 @@ class Context:
             ("anthropic_model", self.anthropic_model),
             ("groq_model", self.groq_model),
             ("vault_path", self.vault_path),
+            ("tools_enabled", json.dumps(self.tools_enabled)),
         ]
         conn.executemany(
             "INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)", rows
@@ -77,4 +79,5 @@ class Context:
             anthropic_model=rows.get("anthropic_model", ""),
             groq_model=rows.get("groq_model", ""),
             vault_path=rows.get("vault_path", ""),
+            tools_enabled=json.loads(rows.get("tools_enabled", "{}")),
         )

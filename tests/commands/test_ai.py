@@ -111,7 +111,7 @@ def test_ask_edit_spark_md(tmp_path):
 # --- Tests Vault tool use ---
 
 def test_vault_context_injected_in_system(tmp_path):
-    ctx = Context(vault_path=str(tmp_path))
+    ctx = Context(vault_path=str(tmp_path), tools_enabled={"obsidian": True})
     captured = {}
 
     def fake_vault_chat(ctx, system, messages, vault_path):
@@ -126,8 +126,8 @@ def test_vault_context_injected_in_system(tmp_path):
     assert "vault" in captured["system"].lower()
 
 
-def test_vault_chat_used_when_vault_set(tmp_path):
-    ctx = Context(vault_path=str(tmp_path))
+def test_vault_chat_used_when_vault_and_tool_enabled(tmp_path):
+    ctx = Context(vault_path=str(tmp_path), tools_enabled={"obsidian": True})
 
     with patch("commands.ai._chat_with_vault", return_value=("Réponse vault.", ["📖 Lecture : a.md"])) as mock_vault:
         with patch.object(ctx, "save"):
@@ -137,6 +137,19 @@ def test_vault_chat_used_when_vault_set(tmp_path):
     assert result.ok
     assert "Réponse vault." in result.message
     assert "📖 Lecture : a.md" in result.message
+
+
+def test_vault_chat_not_used_when_tool_disabled(tmp_path):
+    ctx = Context(vault_path=str(tmp_path), tools_enabled={"obsidian": False})
+
+    with patch("commands.ai._chat", return_value="Sans vault.") as mock_chat:
+        with patch("commands.ai._chat_with_vault") as mock_vault:
+            with patch.object(ctx, "save"):
+                result = ai.handle(ctx, "/ai bonjour")
+
+    mock_chat.assert_called_once()
+    mock_vault.assert_not_called()
+    assert "Sans vault." in result.message
 
 
 def test_plain_chat_used_without_vault():
@@ -204,7 +217,7 @@ def test_run_tool_path_traversal(tmp_path):
 
 
 def test_actions_displayed_in_output(tmp_path):
-    ctx = Context(vault_path=str(tmp_path))
+    ctx = Context(vault_path=str(tmp_path), tools_enabled={"obsidian": True})
     actions = ["📖 Lecture : note.md", "✏️  Modification : note.md"]
 
     with patch("commands.ai._chat_with_vault", return_value=("Fait.", actions)):

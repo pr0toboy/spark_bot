@@ -245,7 +245,8 @@ def handle(ctx, user_input: str) -> Result:
         f"Mémoire : {ctx.memory or 'vide'}\n"
         f"Todos : {ctx.todo_list or 'aucun'}"
     )
-    if ctx.vault_path:
+    vault_active = ctx.vault_path and ctx.tools_enabled.get("obsidian", False)
+    if vault_active:
         spark_context += (
             f"\nVault Obsidian : {ctx.vault_path}\n"
             "Tu peux lister, lire et modifier les notes du vault avec les outils disponibles."
@@ -255,7 +256,7 @@ def handle(ctx, user_input: str) -> Result:
     ctx.chat_history.append({"role": "user", "content": msg})
 
     try:
-        if ctx.vault_path:
+        if vault_active:
             reply, actions = _chat_with_vault(ctx, system, ctx.chat_history, ctx.vault_path)
         else:
             reply = _chat(ctx, system, ctx.chat_history)

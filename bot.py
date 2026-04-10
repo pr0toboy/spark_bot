@@ -1,7 +1,7 @@
 from context import Context
 from commands import (
     start, help as help_cmd, remember, recall,
-    todo, remind, pomodoro, localize, weather, ai, log, note, quote, login, model,
+    todo, remind, pomodoro, localize, weather, ai, log, note, quote, login, model, tools,
 )
 from commands.help import COMMANDS
 
@@ -54,6 +54,7 @@ class SparkBot:
             "/quote":    quote.handle,
             "/login":    login.handle,
             "/model":    model.handle,
+            "/tools":    tools.handle,
         }
         self._session = PromptSession(
             completer=_CommandCompleter(COMMANDS),
