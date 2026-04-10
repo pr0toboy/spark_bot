@@ -106,3 +106,111 @@ def test_ask_edit_spark_md(tmp_path):
             result = ai.handle(Context(), "/ai edit")
     assert result.ok
     assert spark_md.read_text() == "Tu es un assistant."
+
+
+# --- Tests Vault tool use ---
+
+def test_vault_context_injected_in_system(tmp_path):
+    ctx = Context(vault_path=str(tmp_path))
+    captured = {}
+
+    def fake_vault_chat(ctx, system, messages, vault_path):
+        captured["system"] = system
+        return "OK", []
+
+    with patch("commands.ai._chat_with_vault", side_effect=fake_vault_chat):
+        with patch.object(ctx, "save"):
+            ai.handle(ctx, "/ai test vault")
+
+    assert str(tmp_path) in captured["system"]
+    assert "vault" in captured["system"].lower()
+
+
+def test_vault_chat_used_when_vault_set(tmp_path):
+    ctx = Context(vault_path=str(tmp_path))
+
+    with patch("commands.ai._chat_with_vault", return_value=("Réponse vault.", ["📖 Lecture : a.md"])) as mock_vault:
+        with patch.object(ctx, "save"):
+            result = ai.handle(ctx, "/ai lis mes notes")
+
+    mock_vault.assert_called_once()
+    assert result.ok
+    assert "Réponse vault." in result.message
+    assert "📖 Lecture : a.md" in result.message
+
+
+def test_plain_chat_used_without_vault():
+    ctx = Context()
+
+    with patch("commands.ai._chat", return_value="Réponse normale.") as mock_chat:
+        with patch("commands.ai._chat_with_vault") as mock_vault:
+            with patch.object(ctx, "save"):
+                result = ai.handle(ctx, "/ai bonjour")
+
+    mock_chat.assert_called_once()
+    mock_vault.assert_not_called()
+    assert "Réponse normale." in result.message
+
+
+def test_run_tool_list(tmp_path):
+    (tmp_path / "note1.md").write_text("contenu")
+    (tmp_path / "note2.md").write_text("contenu")
+    result, label = ai._run_tool("list_vault_notes", {}, str(tmp_path))
+    assert "note1.md" in result
+    assert "note2.md" in result
+    assert "Listage" in label
+
+
+def test_run_tool_list_empty(tmp_path):
+    result, label = ai._run_tool("list_vault_notes", {}, str(tmp_path))
+    assert "vide" in result
+
+
+def test_run_tool_read(tmp_path):
+    note = tmp_path / "test.md"
+    note.write_text("# Titre\nContenu de la note.")
+    result, label = ai._run_tool("read_vault_note", {"filename": "test.md"}, str(tmp_path))
+    assert "Contenu de la note." in result
+    assert "test.md" in label
+
+
+def test_run_tool_read_missing(tmp_path):
+    result, label = ai._run_tool("read_vault_note", {"filename": "ghost.md"}, str(tmp_path))
+    assert "introuvable" in result.lower()
+
+
+def test_run_tool_write(tmp_path):
+    result, label = ai._run_tool(
+        "write_vault_note",
+        {"filename": "new.md", "content": "# Nouvelle note"},
+        str(tmp_path),
+    )
+    assert (tmp_path / "new.md").read_text() == "# Nouvelle note"
+    assert "new.md" in label
+
+
+def test_run_tool_write_overwrite(tmp_path):
+    note = tmp_path / "existing.md"
+    note.write_text("ancien contenu")
+    ai._run_tool("write_vault_note", {"filename": "existing.md", "content": "nouveau"}, str(tmp_path))
+    assert note.read_text() == "nouveau"
+
+
+def test_run_tool_path_traversal(tmp_path):
+    result, label = ai._run_tool(
+        "read_vault_note", {"filename": "../secret.txt"}, str(tmp_path)
+    )
+    assert "Accès refusé" in result
+
+
+def test_actions_displayed_in_output(tmp_path):
+    ctx = Context(vault_path=str(tmp_path))
+    actions = ["📖 Lecture : note.md", "✏️  Modification : note.md"]
+
+    with patch("commands.ai._chat_with_vault", return_value=("Fait.", actions)):
+        with patch.object(ctx, "save"):
+            result = ai.handle(ctx, "/ai modifie ma note")
+
+    assert "📖 Lecture : note.md" in result.message
+    assert "✏️  Modification : note.md" in result.message
+    assert "Fait." in result.message
