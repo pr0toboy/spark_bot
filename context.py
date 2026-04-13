@@ -1,10 +1,21 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 import json
+import os
+import shutil
 import sqlite3
 
-DB_PATH = Path(__file__).parent / "data" / "spark.db"
-DEFAULT_VAULT_PATH = Path(__file__).parent / "data" / "vault"
+# Données utilisateur dans ~/.local/share/spark/ — indépendant du répertoire d'installation.
+# Overridable via la variable d'environnement SPARK_DATA_DIR.
+DATA_DIR = Path(os.environ.get("SPARK_DATA_DIR", Path.home() / ".local" / "share" / "spark"))
+DB_PATH = DATA_DIR / "spark.db"
+DEFAULT_VAULT_PATH = DATA_DIR / "vault"
+
+# Migration one-shot depuis l'ancien emplacement (spark_bot/data/) si nécessaire.
+_OLD_DB = Path(__file__).parent / "data" / "spark.db"
+if _OLD_DB.exists() and not DB_PATH.exists():
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(_OLD_DB, DB_PATH)
 
 
 def get_conn(db_path: Path = DB_PATH) -> sqlite3.Connection:
