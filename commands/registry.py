@@ -1,16 +1,13 @@
-"""
-Registre unifié de tous les outils Spark.
-
-Chaque outil est défini une seule fois (nom, description, paramètres, handler).
-Les fonctions get_anthropic_tools() / get_openai_tools() génèrent les schemas
-dans le format attendu par chaque provider API.
-"""
-
 from pathlib import Path
+from commands.remind import handle as _remind_handle
+from commands.note import _add as _note_add
+from commands.todo import handle as _todo_handle
+from commands.weather import handle as _weather_handle
+from commands.quote import handle as _quote_handle
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Définitions des outils
+#  Tool definitions
 # ──────────────────────────────────────────────────────────────────────────────
 
 _CORE_REGISTRY = [
@@ -118,7 +115,7 @@ _VAULT_REGISTRY = [
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Génération des schemas par provider
+#  Schema generation
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _to_anthropic(tool: dict) -> dict:
@@ -148,70 +145,62 @@ def _to_openai(tool: dict) -> dict:
     }
 
 
-def get_anthropic_tools(ctx) -> list:
-    tools = [_to_anthropic(t) for t in _CORE_REGISTRY]
+def _get_tools(ctx, formatter) -> list:
+    tools = [formatter(t) for t in _CORE_REGISTRY]
     if ctx.vault_path and ctx.tools_enabled.get("obsidian", False):
-        tools.extend(_to_anthropic(t) for t in _VAULT_REGISTRY)
+        tools.extend(formatter(t) for t in _VAULT_REGISTRY)
     return tools
+
+
+def get_anthropic_tools(ctx) -> list:
+    return _get_tools(ctx, _to_anthropic)
 
 
 def get_openai_tools(ctx) -> list:
-    tools = [_to_openai(t) for t in _CORE_REGISTRY]
-    if ctx.vault_path and ctx.tools_enabled.get("obsidian", False):
-        tools.extend(_to_openai(t) for t in _VAULT_REGISTRY)
-    return tools
+    return _get_tools(ctx, _to_openai)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Exécution des outils
+#  Tool execution
 # ──────────────────────────────────────────────────────────────────────────────
 
 def run_tool(name: str, args: dict, ctx) -> tuple[str, str]:
     """Exécute un outil par nom. Retourne (texte_résultat, label_action)."""
 
     if name == "set_reminder":
-        from commands.remind import handle
-        result = handle(ctx, f"/remind {args['message']}, {args['duration']}")
+        result = _remind_handle(ctx, f"/remind {args['message']}, {args['duration']}")
         return result.message, f"⏰ Rappel : {args['message']} dans {args['duration']}"
 
     if name == "save_note":
-        from commands.note import _add
-        result = _add(args["content"], ctx)
+        result = _note_add(args["content"], ctx)
         return result.message, f"📝 Note : {args['content'][:50]}"
 
     if name == "create_todo_list":
-        from commands.todo import handle
-        result = handle(ctx, f"/todo new {args['list_name']}")
+        result = _todo_handle(ctx, f"/todo new {args['list_name']}")
         return result.message, f"📋 Nouvelle liste : {args['list_name']}"
 
     if name == "add_todo_item":
-        from commands.todo import handle
-        result = handle(ctx, f"/todo add {args['list_name']} {args['item']}")
+        result = _todo_handle(ctx, f"/todo add {args['list_name']} {args['item']}")
         return result.message, f"✅ Todo [{args['list_name']}] : {args['item']}"
 
     if name == "show_todo_list":
-        from commands.todo import handle
-        result = handle(ctx, f"/todo show {args['list_name']}")
+        result = _todo_handle(ctx, f"/todo show {args['list_name']}")
         return result.message, ""
 
     if name == "remove_todo_item":
-        from commands.todo import handle
-        result = handle(ctx, f"/todo remove {args['list_name']} {args['item']}")
+        result = _todo_handle(ctx, f"/todo remove {args['list_name']} {args['item']}")
         return result.message, f"🗑️  Todo supprimé : {args['item']}"
 
     if name == "delete_todo_list":
-        from commands.todo import handle
-        result = handle(ctx, f"/todo delete {args['list_name']}")
+        result = _todo_handle(ctx, f"/todo delete {args['list_name']}")
         return result.message, f"🗑️  Liste supprimée : {args['list_name']}"
 
     if name == "get_weather":
-        from commands.weather import handle
-        result = handle(ctx, "/weather")
+        result = _weather_handle(ctx, "/weather")
         return result.message, "⛅ Météo"
 
     if name == "get_quote":
-        from commands.quote import handle
-        result = handle(ctx, "/quote")
+        result = _quote_handle(ctx, "/quote")
         return result.message, "💬 Citation"
 
     if name in ("list_vault_notes", "read_vault_note", "write_vault_note"):

@@ -8,6 +8,7 @@ from pathlib import Path
 from result import Result
 from commands.model import DEFAULT_ANTHROPIC, DEFAULT_GROQ, DEFAULT_GLM
 from commands.registry import get_anthropic_tools, get_openai_tools, run_tool
+from commands.remind import _active_reminders
 
 _SPARK_MD = Path(__file__).parent.parent / "SPARK.md"
 _HISTORY_WINDOW = 10
@@ -26,6 +27,13 @@ def _resolve_provider(ctx):
     raise ValueError("Aucune clé API. Lance /login anthropic, /login groq ou /login glm.")
 
 
+def _make_openai_client(ctx, api_key: str, provider: str):
+    """Retourne (client, model) pour les providers compatibles OpenAI (groq, glm)."""
+    if provider == "groq":
+        return groq_sdk.Groq(api_key=api_key), ctx.groq_model or DEFAULT_GROQ
+    return ZhipuAI(api_key=api_key), ctx.glm_model or DEFAULT_GLM
+
+
 def _trim(history: list) -> list:
     return history[-_HISTORY_WINDOW:]
 
@@ -41,23 +49,18 @@ def _read_spark_md() -> str:
 
 
 def _get_working_memory(ctx) -> str:
-    """Snapshot de l'état actuel injecté dans chaque appel IA."""
     parts = [f"Date/heure : {datetime.now().strftime('%A %d %B %Y, %H:%M')}"]
 
     if ctx.todo_list:
-        todo_lines = []
-        for name, items in ctx.todo_list.items():
-            item_str = ", ".join(items) if items else "(vide)"
-            todo_lines.append(f"  {name} : {item_str}")
+        todo_lines = [
+            f"  {name} : {', '.join(items) if items else '(vide)'}"
+            for name, items in ctx.todo_list.items()
+        ]
         parts.append("Listes todo :\n" + "\n".join(todo_lines))
 
-    try:
-        from commands.remind import _active_reminders
-        if _active_reminders:
-            msgs = ", ".join(r["message"] for r in _active_reminders)
-            parts.append(f"Rappels en attente : {msgs}")
-    except ImportError:
-        pass
+    if _active_reminders:
+        msgs = ", ".join(r["message"] for r in _active_reminders)
+        parts.append(f"Rappels en attente : {msgs}")
 
     return "\n".join(parts)
 
@@ -69,9 +72,7 @@ def _build_system(ctx) -> str:
     if ctx.memory:
         parts.append(f"Mémoire : {ctx.memory}")
 
-    wm = _get_working_memory(ctx)
-    if wm:
-        parts.append(wm)
+    parts.append(_get_working_memory(ctx))
 
     if ctx.vault_path and ctx.tools_enabled.get("obsidian", False):
         parts.append("Vault Obsidian actif. Tu peux lister, lire et modifier les notes.")
@@ -80,11 +81,11 @@ def _build_system(ctx) -> str:
         skills_lines = "\n".join(f"[{n}] : {i}" for n, i in ctx.skills.items())
         parts.append(f"Skills actifs :\n{skills_lines}")
 
-    return base + ("\n\nContexte :\n" + "\n".join(parts) if parts else "")
+    return base + "\n\nContexte :\n" + "\n".join(parts)
 
 
 def _chat(ctx, system: str, messages: list, max_tokens: int = _MAX_TOKENS) -> tuple[str, list[str]]:
-    """Appel IA simple sans tools — pour compact, router, etc."""
+    """Appel IA simple sans tools — pour compact et le routeur interne."""
     provider, api_key = _resolve_provider(ctx)
 
     if provider == "anthropic":
@@ -95,17 +96,7 @@ def _chat(ctx, system: str, messages: list, max_tokens: int = _MAX_TOKENS) -> tu
         )
         return response.content[0].text, []
 
-    if provider == "groq":
-        model = ctx.groq_model or DEFAULT_GROQ
-        client = groq_sdk.Groq(api_key=api_key)
-        response = client.chat.completions.create(
-            model=model, max_tokens=max_tokens,
-            messages=[{"role": "system", "content": system}] + messages,
-        )
-        return response.choices[0].message.content, []
-
-    model = ctx.glm_model or DEFAULT_GLM
-    client = ZhipuAI(api_key=api_key)
+    client, model = _make_openai_client(ctx, api_key, provider)
     response = client.chat.completions.create(
         model=model, max_tokens=max_tokens,
         messages=[{"role": "system", "content": system}] + messages,
@@ -161,14 +152,7 @@ def _anthropic_agent_loop(ctx, api_key, system, messages) -> tuple[str, list[str
 
 
 def _openai_agent_loop(ctx, api_key, system, messages, provider) -> tuple[str, list[str]]:
-    """Boucle agentique compatible OpenAI (Groq et GLM)."""
-    if provider == "groq":
-        client = groq_sdk.Groq(api_key=api_key)
-        model = ctx.groq_model or DEFAULT_GROQ
-    else:
-        client = ZhipuAI(api_key=api_key)
-        model = ctx.glm_model or DEFAULT_GLM
-
+    client, model = _make_openai_client(ctx, api_key, provider)
     tools = get_openai_tools(ctx)
     history = [{"role": "system", "content": system}] + list(messages)
     actions: list[str] = []
