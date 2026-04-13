@@ -56,7 +56,6 @@ class SparkBot:
             "/model":    model.handle,
             "/tools":    tools.handle,
             "/skills":   skills.handle,
-            "/spark":    spark.handle,
         }
         self._session = PromptSession(
             completer=_CommandCompleter(COMMANDS),
@@ -80,6 +79,15 @@ class SparkBot:
                 self.ctx.save()
                 print("À bientôt !")
                 break
+            if not user_input.startswith("/"):
+                result = spark.handle(self.ctx, f"/spark {user_input}")
+                if result and result.redirect:
+                    user_input = result.redirect
+                else:
+                    if result and result.message:
+                        print(result.message)
+                    continue
+
             cmd = user_input.split()[0]
             handler = self.commands.get(cmd)
             if handler:
