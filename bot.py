@@ -81,25 +81,15 @@ class SparkBot:
                 break
             if not user_input.startswith("/"):
                 result = spark.handle(self.ctx, f"/spark {user_input}")
-                if result and result.redirect:
-                    user_input = result.redirect
-                else:
-                    if result and result.message:
-                        print(result.message)
-                    continue
+                if result and result.message:
+                    print(result.message)
+                continue
 
             cmd = user_input.split()[0]
             handler = self.commands.get(cmd)
             if handler:
                 result = handler(self.ctx, user_input)
                 log.add_entry(cmd, user_input.removeprefix(cmd).strip())
-                if result and result.redirect:
-                    user_input = result.redirect
-                    cmd = user_input.split()[0]
-                    handler = self.commands.get(cmd)
-                    if handler:
-                        result = handler(self.ctx, user_input)
-                        log.add_entry(cmd, user_input.removeprefix(cmd).strip())
                 if result and result.message:
                     print(result.message)
             else:

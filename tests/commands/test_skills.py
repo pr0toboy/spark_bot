@@ -130,23 +130,6 @@ def test_list_shows_preset_tag():
     assert "[preset]" in result.message
 
 
-def test_superpower_injected_in_ai():
-    from commands import ai
-    ctx = Context(skills={"superpower": skills.PRESETS["superpower"]})
-    captured = {}
-
-    def capture(ctx, system, messages, **kwargs):
-        captured["system"] = system
-        return "OK"
-
-    with patch("commands.ai._chat", side_effect=capture):
-        with patch.object(ctx, "save"):
-            ai.handle(ctx, "/ai bonjour")
-
-    assert "[superpower]" in captured["system"]
-    assert "Superpower" in captured["system"]
-
-
 def test_save_called_on_add():
     ctx = Context()
     with patch.object(ctx, "save") as mock_save:
@@ -161,18 +144,37 @@ def test_save_called_on_remove():
     mock_save.assert_called_once()
 
 
-# --- Injection dans /ai ---
+# ──────────────────────────────────────────────────────────────────────────────
+#  Injection dans /ai (system prompt)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_superpower_injected_in_ai():
+    from commands import ai
+    ctx = Context(skills={"superpower": skills.PRESETS["superpower"]})
+    captured = {}
+
+    def capture(ctx, system, messages):
+        captured["system"] = system
+        return "OK", []
+
+    with patch("commands.ai.agent_loop", side_effect=capture):
+        with patch.object(ctx, "save"):
+            ai.handle(ctx, "/ai bonjour")
+
+    assert "[superpower]" in captured["system"]
+    assert "Superpower" in captured["system"]
+
 
 def test_skills_injected_in_system():
     from commands import ai
     ctx = Context(skills={"code": "Écris du code propre."})
     captured = {}
 
-    def capture(ctx, system, messages, **kwargs):
+    def capture(ctx, system, messages):
         captured["system"] = system
-        return "OK"
+        return "OK", []
 
-    with patch("commands.ai._chat", side_effect=capture):
+    with patch("commands.ai.agent_loop", side_effect=capture):
         with patch.object(ctx, "save"):
             ai.handle(ctx, "/ai bonjour")
 
@@ -185,11 +187,11 @@ def test_no_skills_no_injection():
     ctx = Context()
     captured = {}
 
-    def capture(ctx, system, messages, **kwargs):
+    def capture(ctx, system, messages):
         captured["system"] = system
-        return "OK"
+        return "OK", []
 
-    with patch("commands.ai._chat", side_effect=capture):
+    with patch("commands.ai.agent_loop", side_effect=capture):
         with patch.object(ctx, "save"):
             ai.handle(ctx, "/ai bonjour")
 
@@ -201,11 +203,11 @@ def test_multiple_skills_all_injected():
     ctx = Context(skills={"traduction": "Traduis en anglais.", "résumé": "Résume en 3 points."})
     captured = {}
 
-    def capture(ctx, system, messages, **kwargs):
+    def capture(ctx, system, messages):
         captured["system"] = system
-        return "OK"
+        return "OK", []
 
-    with patch("commands.ai._chat", side_effect=capture):
+    with patch("commands.ai.agent_loop", side_effect=capture):
         with patch.object(ctx, "save"):
             ai.handle(ctx, "/ai test")
 

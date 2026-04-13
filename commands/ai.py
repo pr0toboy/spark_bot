@@ -3,117 +3,17 @@ import json
 import anthropic
 import groq as groq_sdk
 from zhipuai import ZhipuAI
+from datetime import datetime
 from pathlib import Path
 from result import Result
 from commands.model import DEFAULT_ANTHROPIC, DEFAULT_GROQ, DEFAULT_GLM
+from commands.registry import get_anthropic_tools, get_openai_tools, run_tool
 
 _SPARK_MD = Path(__file__).parent.parent / "SPARK.md"
-_HISTORY_WINDOW = 10   # messages envoyés au modèle (hors résumé)
+_HISTORY_WINDOW = 10
 _MAX_TOKENS = 1024
-_MAX_TOKENS_VAULT = 2048
-_spark_md_cache: tuple[float, str] | None = None  # (mtime, content)
-
-_VAULT_TOOLS_ANTHROPIC = [
-    {
-        "name": "list_vault_notes",
-        "description": "Liste tous les fichiers .md présents dans le vault Obsidian.",
-        "input_schema": {"type": "object", "properties": {}, "required": []},
-    },
-    {
-        "name": "read_vault_note",
-        "description": "Lit le contenu d'une note du vault Obsidian.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "filename": {"type": "string", "description": "Nom du fichier .md à lire."},
-            },
-            "required": ["filename"],
-        },
-    },
-    {
-        "name": "write_vault_note",
-        "description": (
-            "Modifie ou crée une note dans le vault Obsidian. "
-            "Conserver le frontmatter YAML existant si possible."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "filename": {"type": "string", "description": "Nom du fichier .md."},
-                "content": {"type": "string", "description": "Contenu complet du fichier."},
-            },
-            "required": ["filename", "content"],
-        },
-    },
-]
-
-_VAULT_TOOLS_GROQ = [
-    {
-        "type": "function",
-        "function": {
-            "name": "list_vault_notes",
-            "description": "Liste tous les fichiers .md présents dans le vault Obsidian.",
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "read_vault_note",
-            "description": "Lit le contenu d'une note du vault Obsidian.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "filename": {"type": "string", "description": "Nom du fichier .md à lire."},
-                },
-                "required": ["filename"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "write_vault_note",
-            "description": "Modifie ou crée une note dans le vault Obsidian.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "filename": {"type": "string"},
-                    "content": {"type": "string"},
-                },
-                "required": ["filename", "content"],
-            },
-        },
-    },
-]
-
-
-def _run_tool(name: str, args: dict, vault_path: str) -> tuple[str, str]:
-    """Execute a vault tool. Returns (result, action_label)."""
-    vault = Path(vault_path).expanduser().resolve()
-
-    if name == "list_vault_notes":
-        files = sorted(vault.glob("*.md"))
-        result = "\n".join(f.name for f in files) or "(vault vide)"
-        return result, "📋 Listage du vault"
-
-    if name == "read_vault_note":
-        note_file = (vault / args["filename"]).resolve()
-        if not str(note_file).startswith(str(vault)):
-            return "Accès refusé.", "🚫 Accès refusé"
-        if not note_file.exists():
-            return f"Fichier '{args['filename']}' introuvable.", f"❌ Introuvable : {args['filename']}"
-        return note_file.read_text(), f"📖 Lecture : {args['filename']}"
-
-    if name == "write_vault_note":
-        note_file = (vault / args["filename"]).resolve()
-        if not str(note_file).startswith(str(vault)):
-            return "Accès refusé.", "🚫 Accès refusé"
-        vault.mkdir(parents=True, exist_ok=True)
-        note_file.write_text(args["content"])
-        return "Note sauvegardée.", f"✏️  Modification : {args['filename']}"
-
-    return f"Outil '{name}' inconnu.", ""
+_MAX_TOKENS_AGENT = 2048
+_spark_md_cache: tuple[float, str] | None = None
 
 
 def _resolve_provider(ctx):
@@ -140,22 +40,51 @@ def _read_spark_md() -> str:
     return "Tu es Spark, un assistant CLI."
 
 
-def _build_system(ctx, vault_active: bool) -> str:
+def _get_working_memory(ctx) -> str:
+    """Snapshot de l'état actuel injecté dans chaque appel IA."""
+    parts = [f"Date/heure : {datetime.now().strftime('%A %d %B %Y, %H:%M')}"]
+
+    if ctx.todo_list:
+        todo_lines = []
+        for name, items in ctx.todo_list.items():
+            item_str = ", ".join(items) if items else "(vide)"
+            todo_lines.append(f"  {name} : {item_str}")
+        parts.append("Listes todo :\n" + "\n".join(todo_lines))
+
+    try:
+        from commands.remind import _active_reminders
+        if _active_reminders:
+            msgs = ", ".join(r["message"] for r in _active_reminders)
+            parts.append(f"Rappels en attente : {msgs}")
+    except ImportError:
+        pass
+
+    return "\n".join(parts)
+
+
+def _build_system(ctx) -> str:
     base = _read_spark_md()
     parts = []
+
     if ctx.memory:
         parts.append(f"Mémoire : {ctx.memory}")
-    if ctx.todo_list:
-        parts.append(f"Todos : {ctx.todo_list}")
-    if vault_active:
+
+    wm = _get_working_memory(ctx)
+    if wm:
+        parts.append(wm)
+
+    if ctx.vault_path and ctx.tools_enabled.get("obsidian", False):
         parts.append("Vault Obsidian actif. Tu peux lister, lire et modifier les notes.")
+
     if ctx.skills:
         skills_lines = "\n".join(f"[{n}] : {i}" for n, i in ctx.skills.items())
         parts.append(f"Skills actifs :\n{skills_lines}")
+
     return base + ("\n\nContexte :\n" + "\n".join(parts) if parts else "")
 
 
 def _chat(ctx, system: str, messages: list, max_tokens: int = _MAX_TOKENS) -> tuple[str, list[str]]:
+    """Appel IA simple sans tools — pour compact, router, etc."""
     provider, api_key = _resolve_provider(ctx)
 
     if provider == "anthropic":
@@ -184,28 +113,26 @@ def _chat(ctx, system: str, messages: list, max_tokens: int = _MAX_TOKENS) -> tu
     return response.choices[0].message.content, []
 
 
-def _chat_with_vault(ctx, system: str, messages: list, vault_path: str) -> tuple[str, list[str]]:
-    """Agentic loop with vault tools. Returns (reply, actions)."""
+def agent_loop(ctx, system: str, messages: list) -> tuple[str, list[str]]:
+    """Boucle agentique avec accès à tous les outils du registre."""
     provider, api_key = _resolve_provider(ctx)
-
     if provider == "anthropic":
-        return _anthropic_vault_loop(ctx, api_key, system, messages, vault_path)
-    if provider == "groq":
-        return _groq_vault_loop(ctx, api_key, system, messages, vault_path)
-    return _glm_vault_loop(ctx, api_key, system, messages, vault_path)
+        return _anthropic_agent_loop(ctx, api_key, system, messages)
+    return _openai_agent_loop(ctx, api_key, system, messages, provider)
 
 
-def _anthropic_vault_loop(ctx, api_key, system, messages, vault_path) -> tuple[str, list[str]]:
+def _anthropic_agent_loop(ctx, api_key, system, messages) -> tuple[str, list[str]]:
     model = ctx.anthropic_model or DEFAULT_ANTHROPIC
     client = anthropic.Anthropic(api_key=api_key)
+    tools = get_anthropic_tools(ctx)
     history = list(messages)
-    actions = []
+    actions: list[str] = []
     reply = ""
 
     while True:
         response = client.messages.create(
-            model=model, max_tokens=_MAX_TOKENS_VAULT, system=system,
-            messages=history, tools=_VAULT_TOOLS_ANTHROPIC,
+            model=model, max_tokens=_MAX_TOKENS_AGENT,
+            system=system, messages=history, tools=tools,
         )
 
         text_parts = [b.text for b in response.content if b.type == "text"]
@@ -218,7 +145,7 @@ def _anthropic_vault_loop(ctx, api_key, system, messages, vault_path) -> tuple[s
         tool_results = []
         for block in response.content:
             if block.type == "tool_use":
-                result, label = _run_tool(block.name, block.input, vault_path)
+                result, label = run_tool(block.name, block.input, ctx)
                 if label:
                     actions.append(label)
                 tool_results.append({
@@ -233,17 +160,24 @@ def _anthropic_vault_loop(ctx, api_key, system, messages, vault_path) -> tuple[s
     return reply, actions
 
 
-def _groq_vault_loop(ctx, api_key, system, messages, vault_path) -> tuple[str, list[str]]:
-    model = ctx.groq_model or DEFAULT_GROQ
-    client = groq_sdk.Groq(api_key=api_key)
+def _openai_agent_loop(ctx, api_key, system, messages, provider) -> tuple[str, list[str]]:
+    """Boucle agentique compatible OpenAI (Groq et GLM)."""
+    if provider == "groq":
+        client = groq_sdk.Groq(api_key=api_key)
+        model = ctx.groq_model or DEFAULT_GROQ
+    else:
+        client = ZhipuAI(api_key=api_key)
+        model = ctx.glm_model or DEFAULT_GLM
+
+    tools = get_openai_tools(ctx)
     history = [{"role": "system", "content": system}] + list(messages)
-    actions = []
+    actions: list[str] = []
     reply = ""
 
     while True:
         response = client.chat.completions.create(
-            model=model, max_tokens=_MAX_TOKENS_VAULT, messages=history,
-            tools=_VAULT_TOOLS_GROQ, tool_choice="auto",
+            model=model, max_tokens=_MAX_TOKENS_AGENT,
+            messages=history, tools=tools, tool_choice="auto",
         )
         msg = response.choices[0].message
         reply = msg.content or ""
@@ -254,40 +188,7 @@ def _groq_vault_loop(ctx, api_key, system, messages, vault_path) -> tuple[str, l
         history.append(msg)
         for tool_call in msg.tool_calls:
             args = json.loads(tool_call.function.arguments)
-            result, label = _run_tool(tool_call.function.name, args, vault_path)
-            if label:
-                actions.append(label)
-            history.append({
-                "role": "tool",
-                "tool_call_id": tool_call.id,
-                "content": result,
-            })
-
-    return reply, actions
-
-
-def _glm_vault_loop(ctx, api_key, system, messages, vault_path) -> tuple[str, list[str]]:
-    model = ctx.glm_model or DEFAULT_GLM
-    client = ZhipuAI(api_key=api_key)
-    history = [{"role": "system", "content": system}] + list(messages)
-    actions = []
-    reply = ""
-
-    while True:
-        response = client.chat.completions.create(
-            model=model, max_tokens=_MAX_TOKENS_VAULT, messages=history,
-            tools=_VAULT_TOOLS_GROQ, tool_choice="auto",
-        )
-        msg = response.choices[0].message
-        reply = msg.content or ""
-
-        if not msg.tool_calls:
-            break
-
-        history.append(msg)
-        for tool_call in msg.tool_calls:
-            args = json.loads(tool_call.function.arguments)
-            result, label = _run_tool(tool_call.function.name, args, vault_path)
+            result, label = run_tool(tool_call.function.name, args, ctx)
             if label:
                 actions.append(label)
             history.append({
@@ -333,24 +234,16 @@ def chat_api(ctx, msg: str) -> tuple[str, list[str]]:
 
 
 def _run_turn(ctx, msg: str) -> tuple[str, list[str]]:
-    vault_active = bool(ctx.vault_path and ctx.tools_enabled.get("obsidian", False))
-    system = _build_system(ctx, vault_active)
+    system = _build_system(ctx)
     ctx.chat_history.append({"role": "user", "content": msg})
     try:
-        reply, actions = _dispatch(ctx, system, vault_active)
+        reply, actions = agent_loop(ctx, system, _trim(ctx.chat_history))
     except Exception:
         ctx.chat_history.pop()
         raise
     ctx.chat_history.append({"role": "assistant", "content": reply})
     ctx.save()
     return reply, actions
-
-
-def _dispatch(ctx, system: str, vault_active: bool) -> tuple[str, list[str]]:
-    trimmed = _trim(ctx.chat_history)
-    if vault_active:
-        return _chat_with_vault(ctx, system, trimmed, ctx.vault_path)
-    return _chat(ctx, system, trimmed)
 
 
 def _history(ctx) -> Result:
@@ -375,7 +268,7 @@ def _compact(ctx) -> Result:
 
     history_text = "\n".join(f"{e['role']}: {e['content']}" for e in ctx.chat_history)
     try:
-        summary = _chat(
+        summary, _ = _chat(
             ctx,
             "Tu es un assistant qui résume des conversations de manière concise.",
             [{"role": "user", "content": f"Résume cette conversation en quelques phrases :\n\n{history_text}"}],
