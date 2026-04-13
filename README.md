@@ -2,13 +2,25 @@
 
 # Spark
 
-**Spark** est un assistant personnel en trois couches :
+**Spark is a hybrid personal agent** — it combines deterministic manual tools (reminders, notes, todo lists, timers…) with a multi-provider AI layer (Anthropic, Groq, GLM). You can drive it with explicit slash commands or plain natural language: Spark routes your intent to the right tool automatically.
 
-| Couche | Description |
+| Layer | Description |
 |---|---|
-| **CLI** (`spark`) | REPL Python dans le terminal |
-| **API** (`app/`) | Backend FastAPI exposant le CLI en HTTP |
-| **App Android** (`flutter_app/`) | Application Flutter — APK buildé via GitHub Actions |
+| **CLI** (`spark`) | REPL Python — runs in any terminal |
+| **API** (`app/`) | FastAPI backend exposing the CLI over HTTP |
+| **Android app** (`flutter_app/`) | Flutter client — APK built via GitHub Actions |
+
+---
+
+## What makes Spark a hybrid agent
+
+Most AI assistants are purely conversational. Most CLI tools are purely deterministic. Spark is both:
+
+- **Manual tools** execute instantly, offline, with no tokens spent — reminders, notes, todo lists, pomodoro, weather, quotes, logs.
+- **AI tools** (`/ai`) handle open-ended questions, reasoning, and writing, with access to the same manual tools (Obsidian vault read/write) via an agentic tool-use loop.
+- **Natural language routing** — type anything without a `/` prefix and Spark's router picks the right command automatically. `"remind me to drink water in 20min"` becomes `/remind drink water, 20min`.
+
+This means Spark never wastes a network call on a task a simple function can handle, but always has a reasoning engine available when the task requires it.
 
 ---
 
@@ -22,117 +34,184 @@ source venv/bin/activate
 pip install -e .
 ```
 
-La commande `spark` est ensuite disponible dans le terminal.
+The `spark` command is then available in the terminal.
 
-> Pour y accéder sans activer le venv :
+> Access it without activating the venv:
 > ```bash
 > # ~/.local/bin/spark
 > #!/bin/bash
 > exec /path/to/spark_bot/venv/bin/spark "$@"
 > ```
 
-### Lancer le backend
+### Start the backend
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-En production (Raspberry Pi) : le service `spark.service` démarre automatiquement au boot via systemd.
+On a Raspberry Pi the `spark.service` systemd unit starts it automatically at boot.
 
 ---
 
-## Prérequis
+## Prerequisites
 
 - Python 3.11+
-- Clé API Anthropic et/ou Groq (au moins une pour `/ai`)
+- At least one AI API key: **Anthropic**, **Groq**, or **ZhipuAI (GLM)**
 
 ---
 
-## App Android
+## Android app
 
-Télécharge le dernier APK depuis [Releases](../../releases/tag/latest) et installe-le.
+Download the latest APK from [Releases](../../releases/tag/latest) and install it.
 
-> Activer "Sources inconnues" dans Paramètres → Sécurité si besoin.
+> Enable "Unknown sources" in Settings → Security if needed.
 
-L'app se connecte au backend via une URL configurable dans **Paramètres → URL du serveur** (ex : `http://100.x.x.x:8000` via Tailscale).
+The app connects to the backend via a configurable URL in **Settings → Server URL** (e.g. `http://100.x.x.x:8000` over Tailscale).
 
-Le build APK est automatisé via GitHub Actions (`.github/workflows/build_apk.yml`) et publié à chaque push.
+The APK build is automated via GitHub Actions (`.github/workflows/build_apk.yml`) and published on every push.
 
 ---
 
-## Commandes CLI
+## Usage modes
 
-### Essentiels
+### Slash commands — direct, instant
+Every tool is reachable with a `/command`. No AI involved, no latency.
 
-| Commande | Description |
+```
+/remind drink water, 30min
+/note called Alice back
+/todo add groceries milk
+/pomodoro
+```
+
+### Natural language — automatic routing
+Type anything without `/` and Spark detects your intent and dispatches to the right command.
+
+```
+› remind me to take my meds in 1h
+✨ Spark → /remind take my meds, 1h
+
+› note that the server is back online
+✨ Spark → /note the server is back online
+
+› add bread to my groceries list
+✨ Spark → /todo add groceries bread
+```
+
+If no specific command matches, Spark falls back to `/ai`.
+
+### AI mode — reasoning + vault
+`/ai` gives you a full conversational AI with memory, skills, and optional Obsidian vault access (read/write notes as tool calls).
+
+```
+/ai summarize my notes on project X
+/ai what should I work on today based on my todo lists?
+```
+
+---
+
+## Commands
+
+### Core
+
+| Command | Description |
 |---|---|
-| `/start` | Se présenter et démarrer |
-| `/help` | Afficher l'aide |
-| `/exit` | Quitter |
+| `/start` | Introduce yourself and start |
+| `/help` | Show all commands (`/help <cmd>` for details) |
+| `/exit` | Quit |
 
-### IA (`/ai`)
+### AI (`/ai`)
 
-| Commande | Description |
+| Command | Description |
 |---|---|
-| `/ai <question>` | Poser une question |
-| `/ai history` | Afficher l'historique |
-| `/ai clear` | Vider l'historique |
-| `/ai compact` | Résumer et compacter l'historique |
-| `/ai edit` | Modifier `SPARK.md` |
+| `/ai <question>` | Ask the AI (Anthropic / Groq / GLM) |
+| `/ai history` | Show conversation history |
+| `/ai clear` | Clear history |
+| `/ai compact` | Summarize and compact history (saves tokens) |
+| `/ai edit` | Edit `SPARK.md` (AI personality / system prompt) |
+
+The active provider is Anthropic if a key is configured, then Groq, then GLM.  
+The Obsidian vault is automatically available to the AI if enabled (`/tools enable obsidian`).
 
 ### Notes
 
-| Commande | Description |
+| Command | Description |
 |---|---|
-| `/note <texte>` | Enregistrer une note |
-| `/note list` | Lister les 50 dernières notes |
-| `/note delete <id>` | Supprimer une note |
-| `/note vault <chemin>` | Configurer le vault Obsidian |
-| `/note export` | Exporter vers le vault |
+| `/note <text>` | Save a note (also written to the vault if configured) |
+| `/note list` | List the last 50 notes |
+| `/note delete <id>` | Delete a note |
+| `/note vault <path>` | Set the Obsidian vault path |
+| `/note export` | Export all notes to the vault as `.md` files |
+
+### Todo lists
+
+| Command | Description |
+|---|---|
+| `/todo` | List all lists |
+| `/todo new <name>` | Create a new list |
+| `/todo show <name>` | Display a list |
+| `/todo add <name> <item>` | Add an item |
+| `/todo remove <name> <item>` | Remove an item |
+| `/todo delete <name>` | Delete a list |
 
 ### Skills
 
-| Commande | Description |
+| Command | Description |
 |---|---|
-| `/skills` | Lister les skills actifs |
-| `/skills presets` | Lister les presets |
-| `/skills add <nom>` | Ajouter un skill |
-| `/skills remove <nom>` | Supprimer un skill |
-| `/skills show <nom>` | Afficher les instructions |
+| `/skills` | List active skills |
+| `/skills presets` | List available presets |
+| `/skills add <name>` | Add a skill (preset or custom) |
+| `/skills remove <name>` | Remove a skill |
+| `/skills show <name>` | Show skill instructions |
 
-**Presets :** `superpower` (raisonnement structuré), `cromagnon` (réponses ultra-simples)
+**Presets:** `superpower` (structured reasoning), `cromagnon` (ultra-simple answers)
 
-### Outils
+### Tools (AI integrations)
 
-| Commande | Description |
+| Command | Description |
 |---|---|
-| `/tools` | Lister les outils |
-| `/tools enable obsidian` | Activer l'accès vault pour `/ai` |
-| `/tools disable obsidian` | Désactiver l'accès vault |
+| `/tools` | List tools and their status |
+| `/tools enable obsidian` | Enable vault read/write for `/ai` |
+| `/tools disable obsidian` | Disable vault access |
 
-### Auth & Modèles
+### Auth & Models
 
-| Commande | Description |
+| Command | Description |
 |---|---|
-| `/login anthropic` | Enregistrer la clé Anthropic |
-| `/login groq` | Enregistrer la clé Groq |
-| `/model` | Modèles actifs |
-| `/model list` | Tous les modèles disponibles |
-| `/model anthropic <model>` | Choisir le modèle Anthropic |
-| `/model groq <model>` | Choisir le modèle Groq |
+| `/login anthropic` | Save Anthropic API key |
+| `/login groq` | Save Groq API key |
+| `/login glm` | Save ZhipuAI (GLM) API key |
+| `/model` | Show active models |
+| `/model list` | All available models |
+| `/model anthropic <model>` | Set Anthropic model |
+| `/model groq <model>` | Set Groq model |
+| `/model glm <model>` | Set GLM model |
 
-### Productivité
+### Productivity (manual tools)
 
-| Commande | Description |
+| Command | Description |
 |---|---|
-| `/remember <info>` | Mémoriser une information |
-| `/recall` | Afficher la mémoire |
-| `/todo` | Listes de tâches |
-| `/remind <msg>, <durée>` | Rappel (ex : `10min`, `1h`) |
-| `/pomodoro` | 4 cycles Pomodoro (25min/5min) |
-| `/log` | Journal des actions |
-| `/quote` | Citation inspirante |
-| `/weather` | Météo actuelle |
+| `/remember <info>` | Persist information in AI memory |
+| `/recall` | Display memory |
+| `/remind <msg>, <duration>` | Set a reminder (`10min`, `2h`, `30s`) |
+| `/pomodoro` | 4 Pomodoro cycles (25min work / 5min break) |
+| `/log` | Action journal |
+| `/quote` | Random inspirational quote |
+| `/weather` | Current weather (IP-based) |
+| `/localize` | IP geolocation |
+
+---
+
+## AI providers
+
+| Provider | Priority | Models |
+|---|---|---|
+| **Anthropic** | 1st | claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5 |
+| **Groq** | 2nd | llama-3.3-70b-versatile, llama-3.1-8b-instant, mixtral-8x7b-32768, gemma2-9b-it |
+| **GLM (ZhipuAI)** | 3rd | glm-4-plus, glm-4, glm-4-air, glm-4-flash, glm-z1-flash |
+
+Spark uses whichever provider has a configured key, in priority order.  
+Environment variables `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `GLM_API_KEY` are supported as fallbacks.
 
 ---
 
@@ -140,44 +219,48 @@ Le build APK est automatisé via GitHub Actions (`.github/workflows/build_apk.ym
 
 ```
 spark_bot/
-├── main.py              # Entrée CLI (spark = main:main)
-├── bot.py               # REPL + dispatch commandes
-├── context.py           # Persistance SQLite
-├── result.py            # Type Result(ok, message)
-├── SPARK.md             # System prompt personnalisé (ignoré par git)
+├── main.py              # CLI entry point (spark = main:main)
+├── bot.py               # REPL + command dispatch + natural language routing
+├── context.py           # SQLite persistence (Context dataclass)
+├── result.py            # Result type (ok, message, redirect)
+├── SPARK.md             # Custom AI personality / system prompt (git-ignored)
 ├── commands/
-│   ├── ai.py            # IA + boucle agentique vault (Anthropic & Groq)
-│   ├── note.py          # Notes + export Obsidian
-│   ├── tools.py         # Activation/désactivation outils
-│   ├── skills.py        # Skills injectés dans /ai
-│   ├── login.py         # Clés API
-│   ├── model.py         # Sélection modèle
+│   ├── ai.py            # AI + agentic vault loop (Anthropic, Groq, GLM)
+│   ├── spark.py         # Natural language intent router
+│   ├── note.py          # Notes + Obsidian export
+│   ├── todo.py          # Todo lists
+│   ├── remind.py        # Reminders
+│   ├── pomodoro.py      # Pomodoro timer
+│   ├── tools.py         # Tool enable/disable
+│   ├── skills.py        # AI skills injected into system prompt
+│   ├── login.py         # API key storage
+│   ├── model.py         # Model selection
 │   └── ...
 ├── app/
 │   ├── main.py          # FastAPI app
-│   ├── deps.py          # Injection Context
-│   ├── models.py        # Schémas Pydantic
+│   ├── deps.py          # Context injection
+│   ├── models.py        # Pydantic schemas
 │   └── routes/          # ai, notes, skills, tools, settings
 ├── flutter_app/
 │   ├── lib/             # Dart — screens + services + models
-│   ├── pubspec.yaml
-│   └── STANDALONE_PLAN.md  # Plan migration app autonome (sans Pi)
+│   └── pubspec.yaml
 ├── .github/workflows/
-│   └── build_apk.yml    # Build + release APK Android
+│   └── build_apk.yml    # APK build + GitHub Release
 ├── tests/
 ├── pyproject.toml
-└── data/spark.db        # SQLite (créé automatiquement, ignoré par git)
+└── data/spark.db        # SQLite (auto-created, git-ignored)
 ```
 
 ---
 
 ## Configuration
 
-Les clés API se configurent via `/login anthropic` ou `/login groq`. Elles sont stockées dans `data/spark.db`. Les variables d'environnement `ANTHROPIC_API_KEY` et `GROQ_API_KEY` sont supportées en fallback.
+API keys are set via `/login <provider>` and stored in `data/spark.db`.  
+Environment variables are supported as fallbacks.
 
-Spark utilise Anthropic en priorité. Sans clé Anthropic, il bascule sur Groq (`llama-3.3-70b-versatile`).
+Create `SPARK.md` at the root to customize the AI personality (git-ignored, reloaded on every call).
 
-Crée `SPARK.md` à la racine pour personnaliser la personnalité de l'IA (ignoré par git, rechargé à chaque appel).
+The default Obsidian vault path is `data/vault/` inside the project. Override with `/note vault <path>`.
 
 ---
 
