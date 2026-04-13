@@ -1,10 +1,18 @@
 ![image](documentation/logo_nom.png)
 
-# Spark – Bot CLI personnel
+# Spark
 
-**Spark** est un assistant CLI personnel en Python. Il tourne dans le terminal, retient des informations, gère des listes de tâches, envoie des rappels, répond à des questions via l'IA, et s'intègre avec un vault Obsidian.
+**Spark** est un assistant personnel en trois couches :
 
-## Installation
+| Couche | Description |
+|---|---|
+| **CLI** (`spark`) | REPL Python dans le terminal |
+| **API** (`app/`) | Backend FastAPI exposant le CLI en HTTP |
+| **App Android** (`flutter_app/`) | Application Flutter — APK buildé via GitHub Actions |
+
+---
+
+## Installation (CLI + API)
 
 ```bash
 git clone <repo>
@@ -16,24 +24,49 @@ pip install -e .
 
 La commande `spark` est ensuite disponible dans le terminal.
 
-> Pour y accéder sans activer le venv, crée un wrapper dans `~/.local/bin/spark` :
+> Pour y accéder sans activer le venv :
 > ```bash
+> # ~/.local/bin/spark
 > #!/bin/bash
 > exec /path/to/spark_bot/venv/bin/spark "$@"
 > ```
 
+### Lancer le backend
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+En production (Raspberry Pi) : le service `spark.service` démarre automatiquement au boot via systemd.
+
+---
+
 ## Prérequis
 
 - Python 3.11+
-- Une clé API Anthropic et/ou Groq (au moins une requise pour `/ai`)
+- Clé API Anthropic et/ou Groq (au moins une pour `/ai`)
 
-## Commandes
+---
+
+## App Android
+
+Télécharge le dernier APK depuis [Releases](../../releases/tag/latest) et installe-le.
+
+> Activer "Sources inconnues" dans Paramètres → Sécurité si besoin.
+
+L'app se connecte au backend via une URL configurable dans **Paramètres → URL du serveur** (ex : `http://100.x.x.x:8000` via Tailscale).
+
+Le build APK est automatisé via GitHub Actions (`.github/workflows/build_apk.yml`) et publié à chaque push.
+
+---
+
+## Commandes CLI
 
 ### Essentiels
 
 | Commande | Description |
 |---|---|
-| `/start` | Se présenter et démarrer une session |
+| `/start` | Se présenter et démarrer |
 | `/help` | Afficher l'aide |
 | `/exit` | Quitter |
 
@@ -41,66 +74,50 @@ La commande `spark` est ensuite disponible dans le terminal.
 
 | Commande | Description |
 |---|---|
-| `/ai <question>` | Poser une question à l'IA |
-| `/ai history` | Afficher l'historique de conversation |
+| `/ai <question>` | Poser une question |
+| `/ai history` | Afficher l'historique |
 | `/ai clear` | Vider l'historique |
-| `/ai compact` | Résumer et compacter l'historique (économise des tokens) |
-| `/ai edit` | Modifier `SPARK.md` (personnalité de l'IA) |
-
-L'historique est automatiquement tronqué aux 10 derniers messages pour limiter les tokens.
-
-### Vault Obsidian
-
-| Commande | Description |
-|---|---|
-| `/note vault <chemin>` | Configurer le dossier vault Obsidian |
-| `/note export` | Exporter toutes les notes vers le vault |
-| `/tools enable obsidian` | Donner à `/ai` l'accès lecture/écriture aux notes |
-| `/tools disable obsidian` | Révoquer l'accès |
-
-Une fois le vault activé, `/ai` peut lister, lire et modifier les fichiers `.md` du vault directement.
-
-### Skills IA
-
-Les skills sont des instructions injectées dans le system prompt de `/ai`.
-
-| Commande | Description |
-|---|---|
-| `/skills` | Lister les skills actifs |
-| `/skills presets` | Lister les presets disponibles |
-| `/skills add <nom>` | Ajouter un skill (preset auto si connu, interactif sinon) |
-| `/skills add <nom> <texte>` | Ajouter un skill en une ligne |
-| `/skills remove <nom>` | Supprimer un skill |
-| `/skills show <nom>` | Afficher les instructions d'un skill |
-
-**Presets disponibles :**
-- `superpower` — raisonnement structuré, markdown, réponses exhaustives
-- `cromagnon` — réponses ultra-simples, phrases courtes, analogies caverne
+| `/ai compact` | Résumer et compacter l'historique |
+| `/ai edit` | Modifier `SPARK.md` |
 
 ### Notes
 
 | Commande | Description |
 |---|---|
-| `/note <texte>` | Enregistrer une note (écrit aussi dans le vault si configuré) |
+| `/note <texte>` | Enregistrer une note |
 | `/note list` | Lister les 50 dernières notes |
 | `/note delete <id>` | Supprimer une note |
+| `/note vault <chemin>` | Configurer le vault Obsidian |
+| `/note export` | Exporter vers le vault |
+
+### Skills
+
+| Commande | Description |
+|---|---|
+| `/skills` | Lister les skills actifs |
+| `/skills presets` | Lister les presets |
+| `/skills add <nom>` | Ajouter un skill |
+| `/skills remove <nom>` | Supprimer un skill |
+| `/skills show <nom>` | Afficher les instructions |
+
+**Presets :** `superpower` (raisonnement structuré), `cromagnon` (réponses ultra-simples)
 
 ### Outils
 
 | Commande | Description |
 |---|---|
-| `/tools` | Lister les outils avec leur statut |
-| `/tools enable <outil>` | Activer un outil |
-| `/tools disable <outil>` | Désactiver un outil |
+| `/tools` | Lister les outils |
+| `/tools enable obsidian` | Activer l'accès vault pour `/ai` |
+| `/tools disable obsidian` | Désactiver l'accès vault |
 
-### Modèles & Authentification
+### Auth & Modèles
 
 | Commande | Description |
 |---|---|
-| `/login anthropic` | Enregistrer la clé API Anthropic |
-| `/login groq` | Enregistrer la clé API Groq |
-| `/model` | Afficher les modèles actifs |
-| `/model list` | Lister tous les modèles disponibles |
+| `/login anthropic` | Enregistrer la clé Anthropic |
+| `/login groq` | Enregistrer la clé Groq |
+| `/model` | Modèles actifs |
+| `/model list` | Tous les modèles disponibles |
 | `/model anthropic <model>` | Choisir le modèle Anthropic |
 | `/model groq <model>` | Choisir le modèle Groq |
 
@@ -109,47 +126,60 @@ Les skills sont des instructions injectées dans le system prompt de `/ai`.
 | Commande | Description |
 |---|---|
 | `/remember <info>` | Mémoriser une information |
-| `/recall` | Afficher ce que Spark a mémorisé |
-| `/todo` | Gérer des listes de tâches (REPL interne) |
-| `/remind <msg>, <durée>` | Créer un rappel (ex: `10min`, `1h`) |
-| `/pomodoro` | Lancer 4 cycles Pomodoro (25min/5min) |
+| `/recall` | Afficher la mémoire |
+| `/todo` | Listes de tâches |
+| `/remind <msg>, <durée>` | Rappel (ex : `10min`, `1h`) |
+| `/pomodoro` | 4 cycles Pomodoro (25min/5min) |
 | `/log` | Journal des actions |
-| `/quote` | Afficher une citation inspirante |
-| `/localize` | Afficher la localisation IP |
-| `/weather` | Afficher la météo actuelle |
+| `/quote` | Citation inspirante |
+| `/weather` | Météo actuelle |
+
+---
 
 ## Architecture
 
 ```
 spark_bot/
-├── main.py           # Point d'entrée (spark = main:main)
-├── bot.py            # REPL principal et dispatch des commandes
-├── context.py        # Persistance SQLite (Context, get_conn)
-├── result.py         # Type Result(ok, message)
-├── SPARK.md          # Personnalité/system prompt (optionnel, ignoré par git)
+├── main.py              # Entrée CLI (spark = main:main)
+├── bot.py               # REPL + dispatch commandes
+├── context.py           # Persistance SQLite
+├── result.py            # Type Result(ok, message)
+├── SPARK.md             # System prompt personnalisé (ignoré par git)
 ├── commands/
-│   ├── ai.py         # IA + boucle agentique vault (Anthropic & Groq)
-│   ├── note.py       # Notes + export Obsidian (.md avec frontmatter YAML)
-│   ├── tools.py      # Activation/désactivation des outils
-│   ├── skills.py     # Instructions custom injectées dans /ai
-│   ├── login.py      # Clés API
-│   ├── model.py      # Sélection du modèle
-│   ├── log.py        # Journal
+│   ├── ai.py            # IA + boucle agentique vault (Anthropic & Groq)
+│   ├── note.py          # Notes + export Obsidian
+│   ├── tools.py         # Activation/désactivation outils
+│   ├── skills.py        # Skills injectés dans /ai
+│   ├── login.py         # Clés API
+│   ├── model.py         # Sélection modèle
 │   └── ...
+├── app/
+│   ├── main.py          # FastAPI app
+│   ├── deps.py          # Injection Context
+│   ├── models.py        # Schémas Pydantic
+│   └── routes/          # ai, notes, skills, tools, settings
+├── flutter_app/
+│   ├── lib/             # Dart — screens + services + models
+│   ├── pubspec.yaml
+│   └── STANDALONE_PLAN.md  # Plan migration app autonome (sans Pi)
+├── .github/workflows/
+│   └── build_apk.yml    # Build + release APK Android
 ├── tests/
 ├── pyproject.toml
-└── data/spark.db     # SQLite (créé automatiquement, ignoré par git)
+└── data/spark.db        # SQLite (créé automatiquement, ignoré par git)
 ```
 
-## Configuration API
+---
 
-Lance `/login anthropic` ou `/login groq` au premier démarrage. Les clés sont stockées dans `data/spark.db` et rechargées automatiquement. Les variables d'environnement `ANTHROPIC_API_KEY` et `GROQ_API_KEY` sont supportées en fallback.
+## Configuration
+
+Les clés API se configurent via `/login anthropic` ou `/login groq`. Elles sont stockées dans `data/spark.db`. Les variables d'environnement `ANTHROPIC_API_KEY` et `GROQ_API_KEY` sont supportées en fallback.
 
 Spark utilise Anthropic en priorité. Sans clé Anthropic, il bascule sur Groq (`llama-3.3-70b-versatile`).
 
-## Personnaliser Spark
+Crée `SPARK.md` à la racine pour personnaliser la personnalité de l'IA (ignoré par git, rechargé à chaque appel).
 
-Crée `SPARK.md` à la racine pour définir la personnalité et le contexte de l'IA. Ce fichier est ignoré par git. Les modifications prennent effet immédiatement (lecture à chaque appel).
+---
 
 ## Tests
 

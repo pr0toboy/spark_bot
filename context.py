@@ -4,6 +4,7 @@ import json
 import sqlite3
 
 DB_PATH = Path(__file__).parent / "data" / "spark.db"
+DEFAULT_VAULT_PATH = Path(__file__).parent / "data" / "vault"
 
 
 def get_conn(db_path: Path = DB_PATH) -> sqlite3.Connection:
@@ -80,7 +81,7 @@ class Context:
             groq_api_key=rows.get("groq_api_key", ""),
             anthropic_model=rows.get("anthropic_model", ""),
             groq_model=rows.get("groq_model", ""),
-            vault_path=rows.get("vault_path", ""),
-            tools_enabled=json.loads(rows.get("tools_enabled", "{}")),
+            vault_path=rows.get("vault_path", str(DEFAULT_VAULT_PATH)),
+            tools_enabled=json.loads(rows["tools_enabled"]) if "tools_enabled" in rows else {"obsidian": True},
             skills=json.loads(rows.get("skills", "{}")),
         )

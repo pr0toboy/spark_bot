@@ -152,7 +152,7 @@ def _build_system(ctx, vault_active: bool) -> str:
     return base + ("\n\nContexte :\n" + "\n".join(parts) if parts else "")
 
 
-def _chat(ctx, system: str, messages: list, max_tokens: int = _MAX_TOKENS) -> str:
+def _chat(ctx, system: str, messages: list, max_tokens: int = _MAX_TOKENS) -> tuple[str, list[str]]:
     provider, api_key = _resolve_provider(ctx)
 
     if provider == "anthropic":
@@ -161,7 +161,7 @@ def _chat(ctx, system: str, messages: list, max_tokens: int = _MAX_TOKENS) -> st
         response = client.messages.create(
             model=model, max_tokens=max_tokens, system=system, messages=messages,
         )
-        return response.content[0].text
+        return response.content[0].text, []
 
     model = ctx.groq_model or DEFAULT_GROQ
     client = groq_sdk.Groq(api_key=api_key)
@@ -169,7 +169,7 @@ def _chat(ctx, system: str, messages: list, max_tokens: int = _MAX_TOKENS) -> st
         model=model, max_tokens=max_tokens,
         messages=[{"role": "system", "content": system}] + messages,
     )
-    return response.choices[0].message.content
+    return response.choices[0].message.content, []
 
 
 def _chat_with_vault(ctx, system: str, messages: list, vault_path: str) -> tuple[str, list[str]]:
@@ -184,7 +184,7 @@ def _chat_with_vault(ctx, system: str, messages: list, vault_path: str) -> tuple
 def _anthropic_vault_loop(ctx, api_key, system, messages, vault_path) -> tuple[str, list[str]]:
     model = ctx.anthropic_model or DEFAULT_ANTHROPIC
     client = anthropic.Anthropic(api_key=api_key)
-    history = _trim(messages)
+    history = list(messages)
     actions = []
     reply = ""
 
@@ -222,7 +222,7 @@ def _anthropic_vault_loop(ctx, api_key, system, messages, vault_path) -> tuple[s
 def _groq_vault_loop(ctx, api_key, system, messages, vault_path) -> tuple[str, list[str]]:
     model = ctx.groq_model or DEFAULT_GROQ
     client = groq_sdk.Groq(api_key=api_key)
-    history = [{"role": "system", "content": system}] + _trim(messages)
+    history = [{"role": "system", "content": system}] + list(messages)
     actions = []
     reply = ""
 
@@ -272,26 +272,38 @@ def handle(ctx, user_input: str) -> Result:
             "        /ai edit      — modifier SPARK.md"
         )
 
-    vault_active = bool(ctx.vault_path and ctx.tools_enabled.get("obsidian", False))
-    system = _build_system(ctx, vault_active)
-
-    ctx.chat_history.append({"role": "user", "content": msg})
-
     try:
-        if vault_active:
-            reply, actions = _chat_with_vault(ctx, system, ctx.chat_history, ctx.vault_path)
-        else:
-            reply = _chat(ctx, system, _trim(ctx.chat_history))
-            actions = []
+        reply, actions = _run_turn(ctx, msg)
     except ValueError as e:
-        ctx.chat_history.pop()
         return Result.error(str(e))
-
-    ctx.chat_history.append({"role": "assistant", "content": reply})
-    ctx.save()
 
     output = "\n".join(actions + [f"Spark : {reply}"])
     return Result.success(output)
+
+
+def chat_api(ctx, msg: str) -> tuple[str, list[str]]:
+    return _run_turn(ctx, msg)
+
+
+def _run_turn(ctx, msg: str) -> tuple[str, list[str]]:
+    vault_active = bool(ctx.vault_path and ctx.tools_enabled.get("obsidian", False))
+    system = _build_system(ctx, vault_active)
+    ctx.chat_history.append({"role": "user", "content": msg})
+    try:
+        reply, actions = _dispatch(ctx, system, vault_active)
+    except Exception:
+        ctx.chat_history.pop()
+        raise
+    ctx.chat_history.append({"role": "assistant", "content": reply})
+    ctx.save()
+    return reply, actions
+
+
+def _dispatch(ctx, system: str, vault_active: bool) -> tuple[str, list[str]]:
+    trimmed = _trim(ctx.chat_history)
+    if vault_active:
+        return _chat_with_vault(ctx, system, trimmed, ctx.vault_path)
+    return _chat(ctx, system, trimmed)
 
 
 def _history(ctx) -> Result:
