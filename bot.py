@@ -1,7 +1,7 @@
 from context import Context
 from commands import (
     start, help as help_cmd, remember, recall,
-    todo, remind, pomodoro, localize, weather, ai, log, note, quote, login, model, tools, skills,
+    todo, remind, pomodoro, localize, weather, ai, log, note, quote, login, model, tools, skills, spark,
 )
 from commands.help import COMMANDS
 
@@ -56,6 +56,7 @@ class SparkBot:
             "/model":    model.handle,
             "/tools":    tools.handle,
             "/skills":   skills.handle,
+            "/spark":    spark.handle,
         }
         self._session = PromptSession(
             completer=_CommandCompleter(COMMANDS),
@@ -84,6 +85,13 @@ class SparkBot:
             if handler:
                 result = handler(self.ctx, user_input)
                 log.add_entry(cmd, user_input.removeprefix(cmd).strip())
+                if result and result.redirect:
+                    user_input = result.redirect
+                    cmd = user_input.split()[0]
+                    handler = self.commands.get(cmd)
+                    if handler:
+                        result = handler(self.ctx, user_input)
+                        log.add_entry(cmd, user_input.removeprefix(cmd).strip())
                 if result and result.message:
                     print(result.message)
             else:

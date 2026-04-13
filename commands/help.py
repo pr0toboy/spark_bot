@@ -18,6 +18,7 @@ COMMANDS = [
     ("/weather",  "Afficher la météo actuelle"),
     ("/quote",    "Afficher une citation inspirante"),
     ("/help",     "Afficher cette aide  (ex: /help ai)"),
+    ("/spark",    "Laisser Spark choisir la commande automatiquement"),
     ("/exit",     "Quitter Spark"),
 ]
 
@@ -138,6 +139,16 @@ DETAILS = {
   /help          Affiche la liste de toutes les commandes.
   /help <cmd>    Affiche l'aide détaillée d'une commande (sans le slash).
   Exemple : /help ai, /help note, /help skills""",
+
+    "spark": """\
+/spark — Routage automatique
+  /spark <intention>   Décrit ce que tu veux faire en langage naturel.
+  Spark choisit et exécute automatiquement la bonne commande.
+  Exemples :
+    /spark je dois faire à manger dans 15min
+    /spark note que j'ai appelé Alice
+    /spark ajoute du lait à ma liste courses
+    /spark lance un pomodoro""",
 
     "exit": """\
 /exit — Quitter
