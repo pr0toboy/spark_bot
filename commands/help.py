@@ -5,7 +5,7 @@ COMMANDS = [
     ("/ai",       "Poser une question à l'IA  (history | clear | compact | edit)"),
     ("/remember", "Mémoriser une information"),
     ("/recall",   "Afficher ce que Spark a mémorisé"),
-    ("/todo",     "Gérer une liste de tâches"),
+    ("/todo",     "Gérer des listes de tâches  (new | show | add | remove | delete)"),
     ("/remind",   "Créer un rappel  (ex: /remind boire, 10min)"),
     ("/note",     "Enregistrer une note  (list | delete <id> | vault <path> | export)"),
     ("/log",      "Journal des actions  (ex: /log | /log clear | /log /remind)"),
@@ -51,8 +51,12 @@ DETAILS = {
 
     "todo": """\
 /todo — Listes de tâches
-  Lance un REPL dédié pour gérer des listes de tâches.
-  Commandes internes : add <tâche>, list, done <id>, delete <id>, clear, exit.""",
+  /todo                         Liste toutes les listes et leur nombre d'éléments.
+  /todo new <nom>               Crée une nouvelle liste.
+  /todo show <nom>              Affiche le contenu d'une liste.
+  /todo add <nom> <élément>     Ajoute un élément à une liste.
+  /todo remove <nom> <élément>  Supprime un élément d'une liste.
+  /todo delete <nom>            Supprime une liste entière.""",
 
     "remind": """\
 /remind — Rappels

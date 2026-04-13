@@ -1,96 +1,84 @@
 from result import Result
 
 
+def _parse_name_item(rest: str, subcmd: str, todo_list: dict):
+    """Parse '<nom> <élément>' from rest. Returns (name, item) or Result.error."""
+    parts = rest.split(None, 1)
+    if len(parts) < 2:
+        return Result.error(f"Usage : /todo {subcmd} <nom> <élément>")
+    name, item = parts[0], parts[1].strip()
+    if name not in todo_list:
+        return Result.error(f"Liste '{name}' introuvable.")
+    return name, item
+
+
 def handle(ctx, user_input: str) -> Result:
-    print("📒 Gestionnaire de listes")
-    _show_lists(ctx.todo_list)
-    while True:
-        cmd = input("› ").strip()
-        if cmd == "/new":
-            _create_list(ctx)
-        elif cmd == "/show":
-            _show_list(ctx.todo_list)
-        elif cmd == "/edit":
-            _edit_list(ctx)
-        elif cmd == "/remove":
-            _remove_list(ctx)
-        elif cmd == "/exit":
-            break
-        else:
-            print("Commandes : /new, /show, /edit, /remove, /exit")
-    return Result.success()
+    args = user_input.removeprefix("/todo").strip()
 
+    if not args:
+        if not ctx.todo_list:
+            return Result.success("Aucune liste. Crée-en une avec /todo new <nom>.")
+        lines = ["📒 Listes :"]
+        for name, items in ctx.todo_list.items():
+            lines.append(f"  {name} ({len(items)} élément(s))")
+        return Result.success("\n".join(lines))
 
-def _show_lists(todo_list: dict) -> None:
-    if not todo_list:
-        print("Il n'y a pas de liste.")
-    else:
-        print("Listes existantes :")
-        for name in todo_list:
-            print(f"  - {name}")
+    parts = args.split(None, 1)
+    subcmd = parts[0]
+    rest = parts[1] if len(parts) > 1 else ""
 
-
-def _create_list(ctx) -> None:
-    name = input("Nom de la nouvelle liste : ").strip()
-    if name in ctx.todo_list:
-        print("❗ Une liste avec ce nom existe déjà.")
-    else:
+    if subcmd == "new":
+        name = rest.strip()
+        if not name:
+            return Result.error("Usage : /todo new <nom>")
+        if name in ctx.todo_list:
+            return Result.error(f"La liste '{name}' existe déjà.")
         ctx.todo_list[name] = []
         ctx.save()
-        print(f"✅ Liste '{name}' créée.")
+        return Result.success(f"✅ Liste '{name}' créée.")
 
+    if subcmd == "show":
+        name = rest.strip()
+        if not name:
+            return Result.error("Usage : /todo show <nom>")
+        if name not in ctx.todo_list:
+            return Result.error(f"Liste '{name}' introuvable.")
+        items = ctx.todo_list[name]
+        if not items:
+            return Result.success(f"📭 La liste '{name}' est vide.")
+        lines = [f"📋 '{name}' :"]
+        for item in items:
+            lines.append(f"  - {item}")
+        return Result.success("\n".join(lines))
 
-def _show_list(todo_list: dict) -> None:
-    name = input("Quelle liste afficher ? ").strip()
-    if name not in todo_list:
-        print("❌ Liste introuvable.")
-    elif not todo_list[name]:
-        print("📭 La liste est vide.")
-    else:
-        print(f"📋 Contenu de '{name}' :")
-        for item in todo_list[name]:
-            print(f"  - {item}")
+    if subcmd == "add":
+        parsed = _parse_name_item(rest, subcmd, ctx.todo_list)
+        if isinstance(parsed, Result):
+            return parsed
+        name, item = parsed
+        ctx.todo_list[name].append(item)
+        ctx.save()
+        return Result.success(f"✅ '{item}' ajouté à '{name}'.")
 
+    if subcmd == "remove":
+        parsed = _parse_name_item(rest, subcmd, ctx.todo_list)
+        if isinstance(parsed, Result):
+            return parsed
+        name, item = parsed
+        if item not in ctx.todo_list[name]:
+            return Result.error(f"Élément '{item}' non trouvé dans '{name}'.")
+        ctx.todo_list[name].remove(item)
+        ctx.save()
+        return Result.success(f"✅ '{item}' supprimé de '{name}'.")
 
-def _remove_list(ctx) -> None:
-    name = input("Quelle liste supprimer ? ").strip()
-    if name in ctx.todo_list:
+    if subcmd == "delete":
+        name = rest.strip()
+        if not name:
+            return Result.error("Usage : /todo delete <nom>")
+        if name not in ctx.todo_list:
+            return Result.error(f"Liste '{name}' introuvable.")
         del ctx.todo_list[name]
         ctx.save()
-        print(f"✅ Liste '{name}' supprimée.")
-    else:
-        print("❗ Cette liste n'existe pas.")
+        return Result.success(f"✅ Liste '{name}' supprimée.")
 
-
-def _edit_list(ctx) -> None:
-    name = input("Quelle liste éditer ? ").strip()
-    if name not in ctx.todo_list:
-        print("❌ Liste introuvable.")
-        return
-    items = ctx.todo_list[name]
-    while True:
-        print(f"(édition de '{name}') Tape /add, /remove, /show ou /exit :")
-        cmd = input("› ").strip()
-        if cmd == "/add":
-            item = input("Nom du nouvel élément : ").strip()
-            items.append(item)
-            ctx.save()
-            print("✅ Ajouté.")
-        elif cmd == "/remove":
-            item = input("Nom de l'élément à supprimer : ").strip()
-            if item in items:
-                items.remove(item)
-                ctx.save()
-                print("✅ Supprimé.")
-            else:
-                print("❌ Élément non trouvé.")
-        elif cmd == "/show":
-            if not items:
-                print("📭 La liste est vide.")
-            else:
-                for i in items:
-                    print(f"  - {i}")
-        elif cmd == "/exit":
-            break
-        else:
-            print("Commandes : /add, /remove, /show, /exit")
+    return Result.error(f"Sous-commande inconnue : '{subcmd}'. Tape /help todo.")
