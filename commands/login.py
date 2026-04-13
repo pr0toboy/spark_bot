@@ -1,7 +1,7 @@
 import getpass
 from result import Result
 
-_PROVIDERS = ("anthropic", "groq")
+_PROVIDERS = ("anthropic", "groq", "glm")
 
 
 def handle(ctx, user_input: str) -> Result:
@@ -33,6 +33,8 @@ def handle(ctx, user_input: str) -> Result:
         if not api_key.startswith("gsk_"):
             return Result.error("Clé Groq invalide (doit commencer par 'gsk_').")
         ctx.groq_api_key = api_key
+    elif arg == "glm":
+        ctx.glm_api_key = api_key
 
     ctx.save()
     return Result.success(f"Clé {arg.capitalize()} sauvegardée.")

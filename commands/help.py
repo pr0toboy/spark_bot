@@ -9,8 +9,8 @@ COMMANDS = [
     ("/remind",   "Créer un rappel  (ex: /remind boire, 10min)"),
     ("/note",     "Enregistrer une note  (list | delete <id> | vault <path> | export)"),
     ("/log",      "Journal des actions  (ex: /log | /log clear | /log /remind)"),
-    ("/login",    "Enregistrer une clé API  (anthropic | groq)"),
-    ("/model",    "Choisir le modèle IA  (list | anthropic <m> | groq <m>)"),
+    ("/login",    "Enregistrer une clé API  (anthropic | groq | glm)"),
+    ("/model",    "Choisir le modèle IA  (list | anthropic <m> | groq <m> | glm <m>)"),
     ("/tools",    "Activer/désactiver des outils  (list | enable <outil> | disable <outil>)"),
     ("/skills",   "Gérer les skills de l'IA  (list | presets | add <nom> | remove | show)"),
     ("/pomodoro", "Lancer un minuteur Pomodoro (4 cycles 25min/5min)"),
@@ -85,15 +85,17 @@ DETAILS = {
 /login — Clés API
   /login anthropic   Enregistre la clé API Anthropic (Claude).
   /login groq        Enregistre la clé API Groq (Llama).
+  /login glm         Enregistre la clé API ZhipuAI (GLM).
   Les clés sont stockées dans data/spark.db.
-  Les variables d'environnement ANTHROPIC_API_KEY et GROQ_API_KEY sont supportées en fallback.""",
+  Variables d'environnement supportées : ANTHROPIC_API_KEY, GROQ_API_KEY, GLM_API_KEY.""",
 
     "model": """\
 /model — Sélection du modèle IA
   /model                      Affiche les modèles actifs.
   /model list                 Liste tous les modèles disponibles.
   /model anthropic <modèle>   Choisit le modèle Anthropic à utiliser.
-  /model groq <modèle>        Choisit le modèle Groq à utiliser.""",
+  /model groq <modèle>        Choisit le modèle Groq à utiliser.
+  /model glm <modèle>         Choisit le modèle GLM (ZhipuAI) à utiliser.""",
 
     "tools": """\
 /tools — Outils externes

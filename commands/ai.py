@@ -2,9 +2,10 @@ import os
 import json
 import anthropic
 import groq as groq_sdk
+from zhipuai import ZhipuAI
 from pathlib import Path
 from result import Result
-from commands.model import DEFAULT_ANTHROPIC, DEFAULT_GROQ
+from commands.model import DEFAULT_ANTHROPIC, DEFAULT_GROQ, DEFAULT_GLM
 
 _SPARK_MD = Path(__file__).parent.parent / "SPARK.md"
 _HISTORY_WINDOW = 10   # messages envoyés au modèle (hors résumé)
@@ -120,7 +121,9 @@ def _resolve_provider(ctx):
         return "anthropic", ctx.api_key or os.environ["ANTHROPIC_API_KEY"]
     if ctx.groq_api_key or os.environ.get("GROQ_API_KEY"):
         return "groq", ctx.groq_api_key or os.environ["GROQ_API_KEY"]
-    raise ValueError("Aucune clé API. Lance /login anthropic ou /login groq.")
+    if ctx.glm_api_key or os.environ.get("GLM_API_KEY"):
+        return "glm", ctx.glm_api_key or os.environ["GLM_API_KEY"]
+    raise ValueError("Aucune clé API. Lance /login anthropic, /login groq ou /login glm.")
 
 
 def _trim(history: list) -> list:
@@ -163,8 +166,17 @@ def _chat(ctx, system: str, messages: list, max_tokens: int = _MAX_TOKENS) -> tu
         )
         return response.content[0].text, []
 
-    model = ctx.groq_model or DEFAULT_GROQ
-    client = groq_sdk.Groq(api_key=api_key)
+    if provider == "groq":
+        model = ctx.groq_model or DEFAULT_GROQ
+        client = groq_sdk.Groq(api_key=api_key)
+        response = client.chat.completions.create(
+            model=model, max_tokens=max_tokens,
+            messages=[{"role": "system", "content": system}] + messages,
+        )
+        return response.choices[0].message.content, []
+
+    model = ctx.glm_model or DEFAULT_GLM
+    client = ZhipuAI(api_key=api_key)
     response = client.chat.completions.create(
         model=model, max_tokens=max_tokens,
         messages=[{"role": "system", "content": system}] + messages,
@@ -178,7 +190,9 @@ def _chat_with_vault(ctx, system: str, messages: list, vault_path: str) -> tuple
 
     if provider == "anthropic":
         return _anthropic_vault_loop(ctx, api_key, system, messages, vault_path)
-    return _groq_vault_loop(ctx, api_key, system, messages, vault_path)
+    if provider == "groq":
+        return _groq_vault_loop(ctx, api_key, system, messages, vault_path)
+    return _glm_vault_loop(ctx, api_key, system, messages, vault_path)
 
 
 def _anthropic_vault_loop(ctx, api_key, system, messages, vault_path) -> tuple[str, list[str]]:
@@ -222,6 +236,39 @@ def _anthropic_vault_loop(ctx, api_key, system, messages, vault_path) -> tuple[s
 def _groq_vault_loop(ctx, api_key, system, messages, vault_path) -> tuple[str, list[str]]:
     model = ctx.groq_model or DEFAULT_GROQ
     client = groq_sdk.Groq(api_key=api_key)
+    history = [{"role": "system", "content": system}] + list(messages)
+    actions = []
+    reply = ""
+
+    while True:
+        response = client.chat.completions.create(
+            model=model, max_tokens=_MAX_TOKENS_VAULT, messages=history,
+            tools=_VAULT_TOOLS_GROQ, tool_choice="auto",
+        )
+        msg = response.choices[0].message
+        reply = msg.content or ""
+
+        if not msg.tool_calls:
+            break
+
+        history.append(msg)
+        for tool_call in msg.tool_calls:
+            args = json.loads(tool_call.function.arguments)
+            result, label = _run_tool(tool_call.function.name, args, vault_path)
+            if label:
+                actions.append(label)
+            history.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": result,
+            })
+
+    return reply, actions
+
+
+def _glm_vault_loop(ctx, api_key, system, messages, vault_path) -> tuple[str, list[str]]:
+    model = ctx.glm_model or DEFAULT_GLM
+    client = ZhipuAI(api_key=api_key)
     history = [{"role": "system", "content": system}] + list(messages)
     actions = []
     reply = ""
