@@ -148,10 +148,12 @@ DETAILS = {
   /crypto alert list                   Liste les alertes (actives + déclenchées)
   /crypto alert remove <id>            Supprime une alerte
   /crypto alert check                  Vérifie toutes les alertes maintenant
+  /crypto import <fichier.csv>         Importe les comptes depuis un export Ledger Live
 
   Coins reconnus : btc, eth, sol, bnb, xrp, ada, doge, dot, avax, matic…
+  Chaînes supportées : BTC (adresse + xpub), ETH, SOL, DOT.
   Prix : CoinGecko (gratuit, sans clé).
-  Balances BTC : blockchain.info. Balances ETH : Etherscan (clé publique).""",
+  Balances : blockchain.info (BTC), Blockchair (xpub), Etherscan, Solana RPC, Subscan (DOT).""",
 
     "help": """\
 /help — Aide
