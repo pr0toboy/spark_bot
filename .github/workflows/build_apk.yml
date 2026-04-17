@@ -34,6 +34,7 @@ jobs:
           flutter create --platforms android --project-name spark_app .
           sed -i 's/android:label="[^"]*"/android:label="Spark"/' android/app/src/main/AndroidManifest.xml
           sed -i 's/<application/<application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<manifest[^>]*>/&\n    <uses-permission android:name="android.permission.INTERNET"\/>/' android/app/src/main/AndroidManifest.xml
 
       - name: Flutter pub get
         working-directory: flutter_app
