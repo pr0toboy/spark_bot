@@ -12,6 +12,7 @@ dependencies = [
     "zhipuai",
     "prompt_toolkit",
     "requests",
+    "ecdsa",
 ]
 
 [tool.setuptools]

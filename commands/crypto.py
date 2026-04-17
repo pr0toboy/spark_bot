@@ -1,5 +1,8 @@
 import csv
+import hashlib
+import hmac as _hmac
 import sqlite3
+import struct
 import requests
 from pathlib import Path
 from context import get_conn
@@ -22,6 +25,7 @@ _IDS = {
 _CHAIN_COIN = {
     "btc": "bitcoin", "xpub": "bitcoin",
     "eth": "ethereum",
+    "avax": "avalanche-2",
     "sol": "solana",
     "dot": "polkadot",
 }
@@ -29,7 +33,8 @@ _CHAIN_COIN = {
 # CSV ticker → chain (Ledger Live export)
 _TICKER_CHAIN = {
     "BTC": "xpub",   # Ledger exports xpub for BTC
-    "ETH": "eth", "AVAX": "eth", "MATIC": "eth", "BNB": "eth", "OP": "eth",
+    "ETH": "eth", "MATIC": "eth", "BNB": "eth", "OP": "eth",
+    "AVAX": "avax",
     "SOL": "sol",
     "DOT": "dot",
 }
@@ -43,7 +48,7 @@ def _fmt(usd: float) -> str:
     if usd >= 0.0001: return f"${usd:.6f}"
     return f"${usd:.2e}"
 
-_CHAIN_SYM = {"btc": "₿", "xpub": "₿", "eth": "Ξ", "sol": "◎", "dot": "●"}
+_CHAIN_SYM = {"btc": "₿", "xpub": "₿", "eth": "Ξ", "avax": "▲", "sol": "◎", "dot": "●"}
 
 
 # ── DB ────────────────────────────────────────────────────────────────────────
@@ -68,6 +73,10 @@ def _conn():
             chain TEXT NOT NULL)""")
         c.execute("INSERT INTO crypto_wallets SELECT * FROM _cw_old")
         c.execute("DROP TABLE _cw_old")
+    # Migrate AVAX wallets stored as 'eth' (from old import)
+    c.execute("""UPDATE crypto_wallets SET chain='avax'
+                 WHERE chain='eth' AND (LOWER(label) LIKE '%avalanche%'
+                                    OR LOWER(label) LIKE '%avax%')""")
     c.execute("""CREATE TABLE IF NOT EXISTS crypto_alerts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         coin TEXT NOT NULL,
@@ -102,14 +111,95 @@ def _btc_balance(addr: str) -> float | None:
     except Exception:
         return None
 
+# ── BIP32 / bech32 helpers (xpub balance) ────────────────────────────────────
+
+_B58C = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+_BC32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+
+def _b58decode_check(s: str) -> bytes:
+    n = 0
+    for c in s: n = n * 58 + _B58C.index(c)
+    leading = len(s) - len(s.lstrip("1"))
+    raw = b"\x00" * leading + n.to_bytes((n.bit_length() + 7) // 8 or 1, "big")
+    assert hashlib.sha256(hashlib.sha256(raw[:-4]).digest()).digest()[:4] == raw[-4:]
+    return raw[4:-4]  # strip 4-byte version and checksum
+
+def _bech32_polymod(vals: list) -> int:
+    GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
+    chk = 1
+    for v in vals:
+        b = chk >> 25; chk = ((chk & 0x1FFFFFF) << 5) ^ v
+        for i in range(5):
+            if (b >> i) & 1: chk ^= GEN[i]
+    return chk
+
+def _convertbits(data: bytes, fb: int, tb: int) -> list:
+    acc, bits, ret = 0, 0, []
+    for v in data:
+        acc = ((acc << fb) | v) & 0x3FFFFFFF; bits += fb
+        while bits >= tb:
+            bits -= tb; ret.append((acc >> bits) & ((1 << tb) - 1))
+    if bits: ret.append((acc << (tb - bits)) & ((1 << tb) - 1))
+    return ret
+
+def _p2wpkh_address(pubkey: bytes) -> str:
+    """Compressed pubkey → native SegWit bc1 address."""
+    h160 = hashlib.new("ripemd160", hashlib.sha256(pubkey).digest()).digest()
+    data = [0] + _convertbits(h160, 8, 5)
+    hrp  = "bc"
+    pre  = [ord(c) >> 5 for c in hrp] + [0] + [ord(c) & 31 for c in hrp]
+    chk  = _bech32_polymod(pre + data + [0] * 6) ^ 1
+    enc  = "".join(_BC32[(chk >> (5 * (5 - i))) & 31] for i in range(6))
+    return hrp + "1" + "".join(_BC32[d] for d in data) + enc
+
+def _ckd_pub(chaincode: bytes, pubkey: bytes, index: int) -> tuple[bytes, bytes]:
+    """BIP32 child key derivation (public → public)."""
+    from ecdsa import SECP256k1
+    from ecdsa.ellipticcurve import PointJacobi
+    h  = _hmac.new(chaincode, pubkey + struct.pack(">I", index), hashlib.sha512).digest()
+    il, ir = int.from_bytes(h[:32], "big"), h[32:]
+    G     = SECP256k1.generator
+    curve = SECP256k1.curve
+    p     = curve.p()
+    # Decompress parent pubkey
+    pf, px = pubkey[0], int.from_bytes(pubkey[1:], "big")
+    y2 = (pow(px, 3, p) + curve.a() * px + curve.b()) % p
+    py = pow(y2, (p + 1) // 4, p)
+    if (py % 2) != (pf - 2): py = p - py
+    parent_pt = PointJacobi(curve, px, py, 1)
+    child_pt  = il * G + parent_pt
+    cx, cy = int(child_pt.x()), int(child_pt.y())
+    cpub = bytes([2 if cy % 2 == 0 else 3]) + cx.to_bytes(32, "big")
+    return ir, cpub
+
 def _btc_xpub_balance(xpub: str) -> float | None:
-    # blockchain.info multiaddr supports xpub natively, free, no key
+    """Derive P2WPKH addresses from xpub and query balances via mempool.space."""
     try:
-        r = requests.get(
-            f"https://blockchain.info/multiaddr?active={xpub}",
-            headers=_HDR, timeout=10,
-        )
-        return r.json()["wallet"]["final_balance"] / 1e8
+        raw      = _b58decode_check(xpub)       # 78 bytes without version/checksum
+        chaincode = raw[9:41]
+        pubkey    = raw[41:]
+
+        # Derive m/0 (external) and m/1 (change) branches
+        ext_cc, ext_pk = _ckd_pub(chaincode, pubkey, 0)
+        chg_cc, chg_pk = _ckd_pub(chaincode, pubkey, 1)
+
+        addrs: list[str] = []
+        for i in range(20):    # 20 external
+            _, pk = _ckd_pub(ext_cc, ext_pk, i)
+            addrs.append(_p2wpkh_address(pk))
+        for i in range(10):    # 10 change
+            _, pk = _ckd_pub(chg_cc, chg_pk, i)
+            addrs.append(_p2wpkh_address(pk))
+
+        total = 0.0
+        for addr in addrs:
+            r = requests.get(f"https://mempool.space/api/address/{addr}",
+                             headers=_HDR, timeout=8)
+            if r.status_code != 200:
+                continue
+            cs = r.json().get("chain_stats", {})
+            total += (cs.get("funded_txo_sum", 0) - cs.get("spent_txo_sum", 0)) / 1e8
+        return total
     except Exception:
         return None
 
@@ -124,14 +214,57 @@ def _eth_balance(addr: str) -> float | None:
     except Exception:
         return None
 
-def _sol_balance(addr: str) -> float | None:
+def _avax_balance(addr: str) -> float | None:
+    # Avalanche C-Chain public RPC — eth_getBalance, no key required
     try:
         r = requests.post(
-            "https://api.mainnet-beta.solana.com",
-            json={"jsonrpc": "2.0", "id": 1, "method": "getBalance", "params": [addr]},
+            "https://api.avax.network/ext/bc/C/rpc",
+            json={"jsonrpc": "2.0", "id": 1,
+                  "method": "eth_getBalance", "params": [addr, "latest"]},
             headers=_JSON_HDR, timeout=8,
         )
-        return r.json()["result"]["value"] / 1e9
+        return int(r.json()["result"], 16) / 1e18
+    except Exception:
+        return None
+
+_SOL_RPC   = "https://api.mainnet-beta.solana.com"
+_STAKE_PRG = "Stake11111111111111111111111111111111111111"
+
+def _sol_rpc(method: str, params: list) -> dict:
+    r = requests.post(_SOL_RPC,
+        json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+        headers=_JSON_HDR, timeout=10)
+    return r.json()
+
+def _sol_balance(addr: str) -> float | None:
+    """SOL balance = liquid + all stake accounts found in transaction history."""
+    try:
+        liquid = _sol_rpc("getBalance", [addr])["result"]["value"] / 1e9
+
+        # Discover stake accounts by scanning recent transactions
+        sigs = [s["signature"] for s in
+                _sol_rpc("getSignaturesForAddress", [addr, {"limit": 100}]).get("result", [])]
+        candidates: set[str] = set()
+        for sig in sigs:
+            tx = _sol_rpc("getTransaction",
+                          [sig, {"encoding": "json", "maxSupportedTransactionVersion": 0}]).get("result")
+            if not tx or _STAKE_PRG not in tx["transaction"]["message"]["accountKeys"]:
+                continue
+            meta = tx["meta"]
+            for i, acc in enumerate(tx["transaction"]["message"]["accountKeys"]):
+                if acc in (addr, _STAKE_PRG):
+                    continue
+                post = meta["postBalances"][i] if i < len(meta["postBalances"]) else 0
+                if post >= 500_000_000:  # ≥ 0.5 SOL — likely a stake account
+                    candidates.add(acc)
+
+        staked = 0.0
+        for acc in candidates:
+            v = _sol_rpc("getAccountInfo", [acc, {"encoding": "base64"}]).get("result", {}).get("value")
+            if v and v.get("owner") == _STAKE_PRG:
+                staked += v["lamports"] / 1e9
+
+        return liquid + staked
     except Exception:
         return None
 
@@ -173,6 +306,7 @@ def _get_balance(addr: str, chain: str) -> float | None:
     if chain == "btc":  return _btc_balance(addr)
     if chain == "xpub": return _btc_xpub_balance(addr)
     if chain == "eth":  return _eth_balance(addr)
+    if chain == "avax": return _avax_balance(addr)
     if chain == "sol":  return _sol_balance(addr)
     if chain == "dot":  return _dot_balance(addr)
     return None
@@ -196,8 +330,8 @@ def _wallet_line(label: str, address: str, chain: str, price_cache: dict) -> str
     cid    = _CHAIN_COIN.get(chain)
     p      = price_cache.get(cid, {}) if cid else {}
     bal    = _get_balance(address, chain)
-    ticker = "BTC" if chain in ("btc", "xpub") else chain.upper()
-
+    ticker   = {"btc": "BTC", "xpub": "BTC", "eth": "ETH",
+                "avax": "AVAX", "sol": "SOL", "dot": "DOT"}.get(chain, chain.upper())
     decimals = 6 if chain in ("btc", "xpub") else 4
     bal_s = f"{bal:.{decimals}f} {ticker}" if bal is not None else "⚠ indisponible"
 
@@ -439,10 +573,10 @@ def _cmd_portfolio() -> Result:
         lines.append("  Aucun wallet — /crypto wallet add <adresse> <label>")
 
     print("📡 Prix…")
-    top_ids = ["bitcoin", "ethereum", "solana", "polkadot"]
+    top_ids = ["bitcoin", "ethereum", "avalanche-2", "solana", "polkadot"]
     mkt     = _prices(top_ids)
     lines  += ["", "💹 Marché :"]
-    for sym, cid in [("BTC","bitcoin"),("ETH","ethereum"),("SOL","solana"),("DOT","polkadot")]:
+    for sym, cid in [("BTC","bitcoin"),("ETH","ethereum"),("AVAX","avalanche-2"),("SOL","solana"),("DOT","polkadot")]:
         d = mkt.get(cid)
         if d:
             chg = d.get("usd_24h_change") or 0
