@@ -1,13 +1,14 @@
 import sqlite3
 import requests
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, HTTPException
 from app.models import (
-    CryptoWalletItem, CryptoWalletCreate, CryptoPortfolio,
+    CryptoWalletItem, CryptoWalletCreate, CryptoWalletRename, CryptoPortfolio,
     CryptoAlertItem, CryptoAlertCreate, CryptoPriceItem,
     CryptoTrendItem, CryptoMarketItem,
 )
 from commands.crypto import (
-    _conn, _prices, _price_one, _cg_id, _fetch_wallets,
+    _conn, _prices, _price_one, _cg_id, _get_balance,
     _CHAIN_COIN, _detect_chain, _HDR, _CG,
 )
 
@@ -81,6 +82,23 @@ def add_wallet(req: CryptoWalletCreate):
     return CryptoWalletItem(label=req.label, address=req.address, chain=chain)
 
 
+@router.patch("/wallets/{label}", response_model=CryptoWalletItem)
+def rename_wallet(label: str, req: CryptoWalletRename):
+    c = _conn()
+    row = c.execute("SELECT address, chain FROM crypto_wallets WHERE label=?", (label,)).fetchone()
+    if not row:
+        c.close()
+        raise HTTPException(status_code=404, detail=f"Wallet « {label} » introuvable.")
+    try:
+        c.execute("UPDATE crypto_wallets SET label=? WHERE label=?", (req.label, label))
+        c.commit()
+    except sqlite3.IntegrityError:
+        c.close()
+        raise HTTPException(status_code=409, detail=f"Label « {req.label} » déjà utilisé.")
+    c.close()
+    return CryptoWalletItem(label=req.label, address=row[0], chain=row[1])
+
+
 @router.delete("/wallets/{label}")
 def remove_wallet(label: str):
     c = _conn()
@@ -98,30 +116,30 @@ def get_portfolio():
     wallet_rows = c.execute("SELECT label,address,chain FROM crypto_wallets ORDER BY id").fetchall()
     c.close()
 
+    top_ids = [cid for _, cid in _TOP_COINS]
+    wallet_coin_ids = list({_CHAIN_COIN[ch] for _, _, ch in wallet_rows if ch in _CHAIN_COIN})
+    all_ids = list({*top_ids, *wallet_coin_ids})
+
+    with ThreadPoolExecutor(max_workers=len(wallet_rows) + 1) as ex:
+        price_fut = ex.submit(_prices, all_ids)
+        bal_futs = {(a, ch): ex.submit(_get_balance, a, ch) for _, a, ch in wallet_rows}
+        price_cache = price_fut.result()
+        bals = {k: f.result() for k, f in bal_futs.items()}
+
     wallets: list[CryptoWalletItem] = []
     total_usd = 0.0
-    price_cache: dict = {}
-
-    if wallet_rows:
-        price_cache, bals = _fetch_wallets(wallet_rows)
-        for label, address, chain in wallet_rows:
-            bal = bals.get((address, chain))
-            bal_usd: float | None = None
-            if bal is not None:
-                p = price_cache.get(_CHAIN_COIN.get(chain, ""), {})
-                if p.get("usd"):
-                    bal_usd = bal * p["usd"]
-                    total_usd += bal_usd
-            wallets.append(CryptoWalletItem(
-                label=label, address=address, chain=chain,
-                balance=bal, balance_usd=bal_usd,
-            ))
-
-    # Reuse wallet price cache; only fetch top coins not already loaded
-    top_ids = [cid for _, cid in _TOP_COINS]
-    missing = [cid for cid in top_ids if cid not in price_cache]
-    if missing:
-        price_cache.update(_prices(missing))
+    for label, address, chain in wallet_rows:
+        bal = bals.get((address, chain))
+        bal_usd: float | None = None
+        if bal is not None:
+            p = price_cache.get(_CHAIN_COIN.get(chain, ""), {})
+            if p.get("usd"):
+                bal_usd = bal * p["usd"]
+                total_usd += bal_usd
+        wallets.append(CryptoWalletItem(
+            label=label, address=address, chain=chain,
+            balance=bal, balance_usd=bal_usd,
+        ))
 
     market = [
         CryptoMarketItem(

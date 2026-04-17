@@ -3,6 +3,7 @@ import hashlib
 import hmac as _hmac
 import sqlite3
 import struct
+import time
 import requests
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -47,6 +48,10 @@ _STAKE_PRG = "Stake11111111111111111111111111111111111111"
 
 # One-time DB migration flag (reset on process restart, migrations are idempotent)
 _DB_READY = False
+
+# Price cache: {frozenset(coin_ids): (timestamp, result)}
+_PRICE_CACHE: dict = {}
+_PRICE_TTL = 60  # seconds
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -111,12 +116,24 @@ def _conn():
 def _prices(coin_ids: list[str]) -> dict[str, dict]:
     if not coin_ids:
         return {}
+    key = frozenset(coin_ids)
+    cached = _PRICE_CACHE.get(key)
+    if cached and time.time() - cached[0] < _PRICE_TTL:
+        return cached[1]
     try:
         r = requests.get(f"{_CG}/simple/price", headers=_HDR, timeout=8, params={
             "ids": ",".join(coin_ids), "vs_currencies": "usd",
             "include_24hr_change": "true", "include_market_cap": "true",
         })
-        return r.json()
+        if r.status_code != 200:
+            return {}
+        data = r.json()
+        now = time.time()
+        expired = [k for k, (ts, _) in _PRICE_CACHE.items() if now - ts >= _PRICE_TTL]
+        for k in expired:
+            del _PRICE_CACHE[k]
+        _PRICE_CACHE[key] = (now, data)
+        return data
     except Exception:
         return {}
 

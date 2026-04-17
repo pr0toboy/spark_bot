@@ -61,6 +61,15 @@ class ApiService {
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
+  Future<void> _patch(String path, Map<String, dynamic> body) async {
+    final res = await _client.patch(
+      _url(path),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+    _checkStatus(res);
+  }
+
   Future<void> _delete(String path) async {
     final res = await _client.delete(_url(path));
     _checkStatus(res);
@@ -167,6 +176,9 @@ class ApiService {
     final data = await _post('/api/crypto/wallets', {'address': address, 'label': label});
     return CryptoWallet.fromJson(data);
   }
+
+  Future<void> renameCryptoWallet(String oldLabel, String newLabel) =>
+      _patch('/api/crypto/wallets/${Uri.encodeComponent(oldLabel)}', {'label': newLabel});
 
   Future<void> deleteCryptoWallet(String label) =>
       _delete('/api/crypto/wallets/${Uri.encodeComponent(label)}');

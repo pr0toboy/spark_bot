@@ -84,6 +84,10 @@ class CryptoWalletCreate(BaseModel):
     label: str = Field(min_length=1)
 
 
+class CryptoWalletRename(BaseModel):
+    label: str = Field(min_length=1)
+
+
 class CryptoMarketItem(BaseModel):
     symbol: str
     price_usd: float

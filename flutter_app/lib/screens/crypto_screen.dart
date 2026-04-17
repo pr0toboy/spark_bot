@@ -155,6 +155,37 @@ class _CryptoScreenState extends State<CryptoScreen>
     }
   }
 
+  Future<void> _renameWallet(CryptoWallet w) async {
+    final ctrl = TextEditingController(text: w.label);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Renommer le wallet'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Nouveau nom'),
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => Navigator.pop(context, true),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Renommer')),
+        ],
+      ),
+    );
+    final newLabel = ctrl.text.trim();
+    ctrl.dispose();
+    if (confirmed != true || newLabel.isEmpty || newLabel == w.label) return;
+    try {
+      await _api.renameCryptoWallet(w.label, newLabel);
+      setState(() => _portfolio = null);
+      await _loadPortfolio();
+    } on ApiException catch (e) {
+      _showErr(e.message);
+    }
+  }
+
   Future<void> _deleteWallet(CryptoWallet w) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -370,7 +401,9 @@ class _CryptoScreenState extends State<CryptoScreen>
           else ...[
             _sectionLabel('WALLETS', Icons.account_balance_wallet_outlined),
             const SizedBox(height: 8),
-            ...p.wallets.map((w) => _WalletTile(w, onDelete: () => _deleteWallet(w))),
+            ...p.wallets.map((w) => _WalletTile(w,
+                onRename: () => _renameWallet(w),
+                onDelete: () => _deleteWallet(w))),
           ],
         ],
       ),
@@ -544,8 +577,9 @@ class _TotalCard extends StatelessWidget {
 
 class _WalletTile extends StatelessWidget {
   final CryptoWallet wallet;
+  final VoidCallback onRename;
   final VoidCallback onDelete;
-  const _WalletTile(this.wallet, {required this.onDelete});
+  const _WalletTile(this.wallet, {required this.onRename, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -595,6 +629,11 @@ class _WalletTile extends StatelessWidget {
                     ],
                   ],
                 ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 20),
+                visualDensity: VisualDensity.compact,
+                onPressed: onRename,
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline, size: 20),
