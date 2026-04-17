@@ -267,7 +267,7 @@ class _CommandsScreenState extends State<CommandsScreen> {
       ),
       body: ListView.builder(
         padding: const EdgeInsets.only(bottom: 24),
-        itemCount: _sections.fold(0, (sum, s) => sum + 1 + s.commands.length),
+        itemCount: _sections.fold<int>(0, (sum, s) => sum + 1 + s.commands.length),
         itemBuilder: (context, index) {
           int offset = 0;
           for (final section in _sections) {
