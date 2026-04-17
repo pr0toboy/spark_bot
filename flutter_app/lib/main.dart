@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/chat_screen.dart';
+import 'screens/claude_screen.dart';
 import 'screens/commands_screen.dart';
 import 'screens/crypto_screen.dart';
 import 'screens/notes_screen.dart';
@@ -42,6 +43,7 @@ class _ShellState extends State<_Shell> {
   static const _screens = [
     ChatScreen(),
     CommandsScreen(),
+    ClaudeScreen(),
     CryptoScreen(),
     NotesScreen(),
     SettingsScreen(),
@@ -57,6 +59,7 @@ class _ShellState extends State<_Shell> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: 'Chat'),
           NavigationDestination(icon: Icon(Icons.terminal_outlined), selectedIcon: Icon(Icons.terminal), label: 'Commandes'),
+          NavigationDestination(icon: Icon(Icons.code_outlined), selectedIcon: Icon(Icons.code), label: 'Claude'),
           NavigationDestination(icon: Icon(Icons.currency_bitcoin), selectedIcon: Icon(Icons.currency_bitcoin), label: 'Crypto'),
           NavigationDestination(icon: Icon(Icons.note_outlined), selectedIcon: Icon(Icons.note), label: 'Notes'),
           NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Paramètres'),

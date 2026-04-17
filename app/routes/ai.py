@@ -7,6 +7,7 @@ from commands import (
     log, note, quote, model, tools, skills, crypto,
     help as help_cmd,
 )
+from commands.claude_cmd import handle as claude_handle
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -24,6 +25,7 @@ _DISPATCH = {
     "/tools":    tools.handle,
     "/skills":   skills.handle,
     "/crypto":   crypto.handle,
+    "/claude":   claude_handle,
     "/help":     help_cmd.handle,
 }
 
