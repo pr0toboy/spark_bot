@@ -67,3 +67,57 @@ class ContextResponse(BaseModel):
     todo_list: dict[str, Any]
     vault_path: str
     chat_history: list[dict[str, str]]
+
+
+# ── Crypto ────────────────────────────────────────────────────────────────────
+
+class CryptoWalletItem(BaseModel):
+    label: str
+    address: str
+    chain: str
+    balance: float | None = None
+    balance_usd: float | None = None
+
+
+class CryptoWalletCreate(BaseModel):
+    address: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+
+
+class CryptoMarketItem(BaseModel):
+    symbol: str
+    price_usd: float
+    change_24h: float
+
+
+class CryptoPortfolio(BaseModel):
+    wallets: list[CryptoWalletItem]
+    market: list[CryptoMarketItem]
+    total_usd: float | None = None
+
+
+class CryptoPriceItem(BaseModel):
+    symbol: str
+    price_usd: float
+    change_24h: float
+    market_cap: float | None = None
+
+
+class CryptoTrendItem(BaseModel):
+    rank: int | None = None
+    symbol: str
+    name: str
+
+
+class CryptoAlertItem(BaseModel):
+    id: int
+    coin: str
+    direction: str
+    price: float
+    active: bool
+
+
+class CryptoAlertCreate(BaseModel):
+    coin: str = Field(min_length=1)
+    direction: str
+    price: float

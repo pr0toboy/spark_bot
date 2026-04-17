@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/crypto.dart';
 import '../models/message.dart';
 import '../models/note.dart';
 import '../models/skill.dart';
@@ -144,6 +145,45 @@ class ApiService {
   }
 
   Future<void> deleteSkill(String name) => _delete('/api/skills/$name');
+
+  // --- Crypto ---
+
+  Future<List<CryptoMarketItem>> getCryptoMarket() async {
+    final list = await _getList('/api/crypto/market');
+    return list.map((e) => CryptoMarketItem.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<CryptoTrend>> getCryptoTrending() async {
+    final list = await _getList('/api/crypto/trending');
+    return list.map((e) => CryptoTrend.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<CryptoPortfolio> getCryptoPortfolio() async {
+    final data = await _get('/api/crypto/portfolio');
+    return CryptoPortfolio.fromJson(data);
+  }
+
+  Future<CryptoWallet> addCryptoWallet(String address, String label) async {
+    final data = await _post('/api/crypto/wallets', {'address': address, 'label': label});
+    return CryptoWallet.fromJson(data);
+  }
+
+  Future<void> deleteCryptoWallet(String label) =>
+      _delete('/api/crypto/wallets/${Uri.encodeComponent(label)}');
+
+  Future<List<CryptoAlert>> getCryptoAlerts() async {
+    final list = await _getList('/api/crypto/alerts');
+    return list.map((e) => CryptoAlert.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<CryptoAlert> addCryptoAlert(String coin, String direction, double price) async {
+    final data = await _post('/api/crypto/alerts', {
+      'coin': coin, 'direction': direction, 'price': price,
+    });
+    return CryptoAlert.fromJson(data);
+  }
+
+  Future<void> deleteCryptoAlert(int id) => _delete('/api/crypto/alerts/$id');
 
   // --- Settings ---
 
