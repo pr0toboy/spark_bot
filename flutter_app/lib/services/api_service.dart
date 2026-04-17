@@ -146,16 +146,6 @@ class ApiService {
 
   Future<void> deleteSkill(String name) => _delete('/api/skills/$name');
 
-  // --- Claude Code ---
-
-  Future<({String reply, bool ok})> runClaude(String prompt, {bool useContinue = false}) async {
-    final data = await _post('/api/claude', {
-      'prompt': prompt,
-      'use_continue': useContinue,
-    });
-    return (reply: data['reply'] as String, ok: data['ok'] as bool);
-  }
-
   // --- Crypto ---
 
   Future<List<CryptoMarketItem>> getCryptoMarket() async {
