@@ -17,6 +17,7 @@ COMMANDS = [
     ("/localize", "Me localiser dans le monde (IP)"),
     ("/weather",  "Afficher la météo actuelle"),
     ("/quote",    "Afficher une citation inspirante"),
+    ("/crypto",   "Crypto : prix, wallets, alertes, tendances"),
     ("/help",     "Afficher cette aide  (ex: /help ai)"),
     ("/exit",     "Quitter Spark"),
 ]
@@ -134,6 +135,23 @@ DETAILS = {
     "quote": """\
 /quote — Citation
   Affiche une citation inspirante aléatoire.""",
+
+    "crypto": """\
+/crypto — Crypto-monnaies
+  /crypto                              Résumé portfolio (wallets + marché)
+  /crypto price <coin>                 Prix + variation 24h  (ex: btc, eth, sol)
+  /crypto news                         Tendances CoinGecko + données globales
+  /crypto wallet add <adresse> <label> Ajoute un wallet à suivre (BTC/ETH détecté auto)
+  /crypto wallet list                  Liste les wallets avec leurs balances
+  /crypto wallet remove <label>        Supprime un wallet
+  /crypto alert add <coin> <above|below> <prix>  Crée une alerte prix
+  /crypto alert list                   Liste les alertes (actives + déclenchées)
+  /crypto alert remove <id>            Supprime une alerte
+  /crypto alert check                  Vérifie toutes les alertes maintenant
+
+  Coins reconnus : btc, eth, sol, bnb, xrp, ada, doge, dot, avax, matic…
+  Prix : CoinGecko (gratuit, sans clé).
+  Balances BTC : blockchain.info. Balances ETH : Etherscan (clé publique).""",
 
     "help": """\
 /help — Aide
