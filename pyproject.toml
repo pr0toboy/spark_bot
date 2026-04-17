@@ -15,6 +15,7 @@ dependencies = [
     "ecdsa",
     "fastapi",
     "uvicorn[standard]",
+    "yt-dlp",
 ]
 
 [tool.setuptools]

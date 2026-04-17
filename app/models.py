@@ -3,7 +3,7 @@ from typing import Any
 
 
 class AiRequest(BaseModel):
-    message: str = Field(min_length=1)
+    message: str = Field(min_length=1, max_length=8000)
 
 
 class AiResponse(BaseModel):
@@ -12,7 +12,7 @@ class AiResponse(BaseModel):
 
 
 class NoteCreate(BaseModel):
-    content: str = Field(min_length=1)
+    content: str = Field(min_length=1, max_length=10000)
 
 
 class NoteItem(BaseModel):
@@ -34,8 +34,8 @@ class ToolItem(BaseModel):
 
 
 class SkillCreate(BaseModel):
-    name: str = Field(min_length=1)
-    instructions: str = Field(min_length=1)
+    name: str = Field(min_length=1, max_length=64)
+    instructions: str = Field(min_length=1, max_length=2000)
 
 
 class SkillItem(BaseModel):

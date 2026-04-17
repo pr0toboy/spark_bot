@@ -286,10 +286,13 @@ def _cmd_delete(conn: sqlite3.Connection, args: str) -> str:
     return f"Habitude « {name} » archivée (données conservées)."
 
 
+_IMPORT_ALLOWED_DIRS = [Path.home()]
+
+
 def _cmd_import(conn: sqlite3.Connection, args: str) -> str:
-    path = Path(args.strip()) if args.strip() else None
+    path = Path(args.strip()).expanduser().resolve() if args.strip() else None
     if not path or not path.exists():
-        default = Path.home() / "ProtoDocs" / "Loop Habits Backup 2026-04-17 230140.db"
+        default = (Path.home() / "ProtoDocs" / "Loop Habits Backup 2026-04-17 230140.db").resolve()
         if default.exists():
             path = default
         else:
@@ -297,6 +300,12 @@ def _cmd_import(conn: sqlite3.Connection, args: str) -> str:
                 "Fichier introuvable. Usage : /habit import <chemin_vers_backup.db>\n"
                 "Exemple : /habit import ~/ProtoDocs/\"Loop Habits Backup 2026-04-17 230140.db\""
             )
+
+    if not any(path.is_relative_to(d) for d in _IMPORT_ALLOWED_DIRS):
+        return f"❌ Chemin refusé : seuls les fichiers sous {Path.home()} sont autorisés."
+
+    if path.suffix.lower() not in (".db", ".sqlite", ".sqlite3"):
+        return "❌ Format non supporté. Seuls les fichiers .db / .sqlite sont acceptés."
 
     src = sqlite3.connect(str(path))
     habits_imported = 0

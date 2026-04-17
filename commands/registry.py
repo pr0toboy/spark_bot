@@ -218,7 +218,7 @@ def _run_vault_tool(name: str, args: dict, vault_path: str) -> tuple[str, str]:
 
     if name == "read_vault_note":
         note_file = (vault / args["filename"]).resolve()
-        if not str(note_file).startswith(str(vault)):
+        if not note_file.is_relative_to(vault):
             return "Accès refusé.", "🚫 Accès refusé"
         if not note_file.exists():
             return f"Fichier '{args['filename']}' introuvable.", f"❌ Introuvable : {args['filename']}"
@@ -226,7 +226,7 @@ def _run_vault_tool(name: str, args: dict, vault_path: str) -> tuple[str, str]:
 
     if name == "write_vault_note":
         note_file = (vault / args["filename"]).resolve()
-        if not str(note_file).startswith(str(vault)):
+        if not note_file.is_relative_to(vault):
             return "Accès refusé.", "🚫 Accès refusé"
         vault.mkdir(parents=True, exist_ok=True)
         note_file.write_text(args["content"])

@@ -19,6 +19,7 @@ COMMANDS = [
     ("/quote",    "Afficher une citation inspirante"),
     ("/crypto",   "Crypto : prix, wallets, alertes, tendances"),
     ("/habit",    "Tracker d'habitudes  (add | check | stats | history | import)"),
+    ("/download", "Télécharger une vidéo  (ex: /download <url> [audio] [-o <dir>])"),
     ("/help",     "Afficher cette aide  (ex: /help ai)"),
     ("/exit",     "Quitter Spark"),
 ]
@@ -169,6 +170,19 @@ DETAILS = {
 
   Fréquences : 1/1j = quotidien (défaut), 3/7j = 3 fois par semaine.
   Raccourci : /habit <nom> coche directement une habitude.""",
+
+    "download": """\
+/download — Téléchargement de vidéo (yt-dlp)
+  /download <url>              Télécharge en meilleure qualité vers ~/Downloads.
+  /download <url> audio        Extrait l'audio uniquement en MP3.
+  /download <url> -o <dossier> Spécifie le dossier de destination.
+
+  Exemples :
+    /download https://youtu.be/xxx
+    /download https://youtu.be/xxx audio
+    /download https://youtu.be/xxx -o ~/Videos
+
+  Nécessite yt-dlp : pip install yt-dlp""",
 
     "help": """\
 /help — Aide
