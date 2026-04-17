@@ -19,6 +19,5 @@ class ClaudeResponse(BaseModel):
 @router.post("", response_model=ClaudeResponse)
 def run_claude(req: ClaudeRequest):
     ctx = load_ctx()
-    api_key = ctx.api_key if hasattr(ctx, "api_key") else None
-    ok, reply = run_prompt(req.prompt, req.use_continue, api_key=api_key)
+    ok, reply = run_prompt(req.prompt, req.use_continue, api_key=ctx.api_key)
     return ClaudeResponse(reply=reply, ok=ok)

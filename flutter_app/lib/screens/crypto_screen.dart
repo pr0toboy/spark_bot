@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import '../models/crypto.dart';
 import '../services/api_service.dart';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 String _fmtUsd(double v) {
   if (v == 0) return '\$0.00';
   if (v >= 1e9) return '\$${(v / 1e9).toStringAsFixed(2)}B';
@@ -27,8 +25,6 @@ const _kBlue   = Color(0xFF7C9CF5);
 const _kGreen  = Color(0xFF7CF5A9);
 const _kPink   = Color(0xFFF57CAA);
 
-// ─── Écran principal ─────────────────────────────────────────────────────────
-
 class CryptoScreen extends StatefulWidget {
   const CryptoScreen({super.key});
 
@@ -41,17 +37,13 @@ class _CryptoScreenState extends State<CryptoScreen>
   final _api = ApiService();
   late final TabController _tab;
 
-  // Marché
   List<CryptoMarketItem> _market = [];
   List<CryptoTrend> _trending = [];
   bool _loadingMarket = true;
 
-  // Portfolio
   CryptoPortfolio? _portfolio;
   bool _loadingPortfolio = false;
-  bool _portfolioLoaded = false;
 
-  // Alertes
   List<CryptoAlert> _alerts = [];
   bool _loadingAlerts = true;
 
@@ -72,7 +64,7 @@ class _CryptoScreenState extends State<CryptoScreen>
   }
 
   void _onTabChange() {
-    if (_tab.index == 1 && !_portfolioLoaded) _loadPortfolio();
+    if (_tab.index == 1 && _portfolio == null) _loadPortfolio();
   }
 
   Future<void> _loadMarket() async {
@@ -99,7 +91,7 @@ class _CryptoScreenState extends State<CryptoScreen>
     try {
       final p = await _api.getCryptoPortfolio();
       if (!mounted) return;
-      setState(() { _portfolio = p; _portfolioLoaded = true; });
+      setState(() => _portfolio = p);
     } catch (e) {
       _showErr(e.toString());
     } finally {
@@ -149,15 +141,14 @@ class _CryptoScreenState extends State<CryptoScreen>
         ],
       ),
     );
-    addrCtrl.dispose();
-    labelCtrl.dispose();
-    if (confirmed != true) return;
     final addr  = addrCtrl.text.trim();
     final label = labelCtrl.text.trim();
-    if (addr.isEmpty || label.isEmpty) return;
+    addrCtrl.dispose();
+    labelCtrl.dispose();
+    if (confirmed != true || addr.isEmpty || label.isEmpty) return;
     try {
       await _api.addCryptoWallet(addr, label);
-      _portfolioLoaded = false;
+      setState(() => _portfolio = null);
       await _loadPortfolio();
     } on ApiException catch (e) {
       _showErr(e.message);
@@ -179,7 +170,7 @@ class _CryptoScreenState extends State<CryptoScreen>
     if (confirmed != true) return;
     try {
       await _api.deleteCryptoWallet(w.label);
-      _portfolioLoaded = false;
+      setState(() => _portfolio = null);
       await _loadPortfolio();
     } on ApiException catch (e) {
       _showErr(e.message);
@@ -258,7 +249,6 @@ class _CryptoScreenState extends State<CryptoScreen>
 
   @override
   Widget build(BuildContext context) {
-    final tabIndex = _tab.index;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Crypto'),
@@ -266,9 +256,9 @@ class _CryptoScreenState extends State<CryptoScreen>
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              if (tabIndex == 0) _loadMarket();
-              if (tabIndex == 1) { _portfolioLoaded = false; _loadPortfolio(); }
-              if (tabIndex == 2) _loadAlerts();
+              if (_tab.index == 0) _loadMarket();
+              if (_tab.index == 1) { setState(() => _portfolio = null); _loadPortfolio(); }
+              if (_tab.index == 2) _loadAlerts();
             },
           ),
         ],
@@ -312,8 +302,6 @@ class _CryptoScreenState extends State<CryptoScreen>
     );
   }
 
-  // ─── Onglet Marché ──────────────────────────────────────────────────────────
-
   Widget _buildMarket() {
     if (_loadingMarket) return const Center(child: CircularProgressIndicator());
     return RefreshIndicator(
@@ -346,24 +334,20 @@ class _CryptoScreenState extends State<CryptoScreen>
     );
   }
 
-  // ─── Onglet Portfolio ───────────────────────────────────────────────────────
-
   Widget _buildPortfolio() {
-    if (_loadingPortfolio || (!_portfolioLoaded && !_loadingPortfolio && _portfolio == null)) {
-      if (!_portfolioLoaded && _portfolio == null && !_loadingPortfolio) {
-        return Center(
-          child: FilledButton.icon(
-            onPressed: _loadPortfolio,
-            icon: const Icon(Icons.download_outlined),
-            label: const Text('Charger le portfolio'),
-          ),
-        );
-      }
-      return const Center(child: CircularProgressIndicator());
+    if (_loadingPortfolio) return const Center(child: CircularProgressIndicator());
+    if (_portfolio == null) {
+      return Center(
+        child: FilledButton.icon(
+          onPressed: _loadPortfolio,
+          icon: const Icon(Icons.download_outlined),
+          label: const Text('Charger le portfolio'),
+        ),
+      );
     }
     final p = _portfolio!;
     return RefreshIndicator(
-      onRefresh: () async { _portfolioLoaded = false; await _loadPortfolio(); },
+      onRefresh: () async { setState(() => _portfolio = null); await _loadPortfolio(); },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(12, 16, 12, 80),
         children: [
@@ -393,8 +377,6 @@ class _CryptoScreenState extends State<CryptoScreen>
     );
   }
 
-  // ─── Onglet Alertes ─────────────────────────────────────────────────────────
-
   Widget _buildAlerts() {
     if (_loadingAlerts) return const Center(child: CircularProgressIndicator());
     if (_alerts.isEmpty) {
@@ -418,8 +400,6 @@ class _CryptoScreenState extends State<CryptoScreen>
     );
   }
 
-  // ─── Helper ─────────────────────────────────────────────────────────────────
-
   Widget _sectionLabel(String label, IconData icon) {
     final theme = Theme.of(context);
     return Row(
@@ -438,8 +418,6 @@ class _CryptoScreenState extends State<CryptoScreen>
     );
   }
 }
-
-// ─── Widgets ─────────────────────────────────────────────────────────────────
 
 class _MarketCard extends StatelessWidget {
   final CryptoMarketItem item;

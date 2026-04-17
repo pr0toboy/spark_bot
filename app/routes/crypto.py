@@ -8,13 +8,10 @@ from app.models import (
 )
 from commands.crypto import (
     _conn, _prices, _price_one, _cg_id, _fetch_wallets,
-    _CHAIN_COIN, _CHAIN_TICKER, _detect_chain,
+    _CHAIN_COIN, _detect_chain, _HDR, _CG,
 )
 
 router = APIRouter(prefix="/api/crypto", tags=["crypto"])
-
-_HDR = {"Accept": "application/json", "User-Agent": "SparkBot/1.0"}
-_CG  = "https://api.coingecko.com/api/v3"
 
 _TOP_COINS = [
     ("BTC",  "bitcoin"),
@@ -103,14 +100,15 @@ def get_portfolio():
 
     wallets: list[CryptoWalletItem] = []
     total_usd = 0.0
+    price_cache: dict = {}
 
     if wallet_rows:
-        cache, bals = _fetch_wallets(wallet_rows)
+        price_cache, bals = _fetch_wallets(wallet_rows)
         for label, address, chain in wallet_rows:
             bal = bals.get((address, chain))
             bal_usd: float | None = None
             if bal is not None:
-                p = cache.get(_CHAIN_COIN.get(chain, ""), {})
+                p = price_cache.get(_CHAIN_COIN.get(chain, ""), {})
                 if p.get("usd"):
                     bal_usd = bal * p["usd"]
                     total_usd += bal_usd
@@ -119,7 +117,12 @@ def get_portfolio():
                 balance=bal, balance_usd=bal_usd,
             ))
 
-    mkt = _prices([cid for _, cid in _TOP_COINS])
+    # Reuse wallet price cache; only fetch top coins not already loaded
+    top_ids = [cid for _, cid in _TOP_COINS]
+    missing = [cid for cid in top_ids if cid not in price_cache]
+    if missing:
+        price_cache.update(_prices(missing))
+
     market = [
         CryptoMarketItem(
             symbol=sym,
@@ -127,7 +130,7 @@ def get_portfolio():
             change_24h=d.get("usd_24h_change") or 0,
         )
         for sym, cid in _TOP_COINS
-        if (d := mkt.get(cid))
+        if (d := price_cache.get(cid))
     ]
 
     return CryptoPortfolio(

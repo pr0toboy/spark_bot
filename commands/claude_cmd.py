@@ -1,12 +1,14 @@
 import os
 import shutil
 import subprocess
+from functools import lru_cache
 from result import Result
 
-_TIMEOUT = 180  # seconds
+_TIMEOUT = 180
 _FALLBACK = os.path.expanduser("~/.local/bin/claude")
 
 
+@lru_cache(maxsize=1)
 def _bin() -> str | None:
     return shutil.which("claude") or (_FALLBACK if os.path.isfile(_FALLBACK) else None)
 
@@ -43,5 +45,5 @@ def handle(ctx, user_input: str) -> Result:
     prompt = user_input.removeprefix("/claude").strip()
     if not prompt:
         return Result.error("Usage : /claude <tâche ou question>  (ex: /claude liste les fichiers du projet)")
-    ok, msg = run_prompt(prompt, api_key=ctx.api_key if hasattr(ctx, "api_key") else None)
+    ok, msg = run_prompt(prompt, api_key=ctx.api_key)
     return Result.success(msg) if ok else Result.error(msg)

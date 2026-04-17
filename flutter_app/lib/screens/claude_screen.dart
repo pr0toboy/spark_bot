@@ -165,8 +165,6 @@ class _ClaudeScreenState extends State<ClaudeScreen>
   }
 }
 
-// ─── Widgets ─────────────────────────────────────────────────────────────────
-
 class _Bubble extends StatelessWidget {
   final _Msg msg;
   const _Bubble(this.msg, {super.key});
