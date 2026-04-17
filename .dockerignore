@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+data/
+.git/
+flutter_app/
+docs/
+documentation/
+tests/
+*.md

@@ -1,0 +1,18 @@
+services:
+  spark:
+    build: .
+    image: spark-bot
+    container_name: spark
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    volumes:
+      - spark_data:/data
+    environment:
+      - SPARK_DATA_DIR=/data
+      # Optionnel — pré-remplir les clés sans passer par /login :
+      # - ANTHROPIC_API_KEY=sk-ant-...
+      # - GROQ_API_KEY=gsk_...
+
+volumes:
+  spark_data:

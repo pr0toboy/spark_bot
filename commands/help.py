@@ -18,6 +18,7 @@ COMMANDS = [
     ("/weather",  "Afficher la météo actuelle"),
     ("/quote",    "Afficher une citation inspirante"),
     ("/crypto",   "Crypto : prix, wallets, alertes, tendances"),
+    ("/claude",   "Lancer Claude Code  (ex: /claude ou /claude <prompt>)"),
     ("/help",     "Afficher cette aide  (ex: /help ai)"),
     ("/exit",     "Quitter Spark"),
 ]
@@ -154,6 +155,13 @@ DETAILS = {
   Chaînes supportées : BTC (adresse + xpub), ETH, SOL, DOT.
   Prix : CoinGecko (gratuit, sans clé).
   Balances : blockchain.info (BTC), Blockchair (xpub), Etherscan, Solana RPC, Subscan (DOT).""",
+
+    "claude": """\
+/claude — Claude Code
+  /claude                Lance une session Claude Code interactive.
+  /claude <prompt>       Exécute une requête en mode non-interactif (-p).
+  La clé Anthropic configurée dans /login est utilisée automatiquement.
+  Ctrl+C pour revenir à Spark.""",
 
     "help": """\
 /help — Aide
