@@ -139,7 +139,7 @@ class _MessageBubble extends StatelessWidget {
           decoration: BoxDecoration(
             color: isUser
                 ? theme.colorScheme.primary
-                : theme.colorScheme.surfaceVariant,
+                : theme.colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
@@ -151,7 +151,7 @@ class _MessageBubble extends StatelessWidget {
                     a,
                     style: TextStyle(
                       fontSize: 11,
-                      color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                       fontStyle: FontStyle.italic,
                     ),
                   ),
@@ -162,7 +162,7 @@ class _MessageBubble extends StatelessWidget {
                 style: TextStyle(
                   color: isUser
                       ? theme.colorScheme.onPrimary
-                      : theme.colorScheme.onSurfaceVariant,
+                      : theme.colorScheme.onSurface,
                 ),
               ),
             ],

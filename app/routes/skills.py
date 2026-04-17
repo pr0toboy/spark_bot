@@ -25,12 +25,11 @@ def list_presets():
 
 @router.post("", response_model=SkillItem)
 def upsert_skill(req: SkillCreate):
-    if not req.name or not req.instructions:
-        raise HTTPException(status_code=400, detail="Nom et instructions requis.")
     ctx = load_ctx()
-    ctx.skills[req.name.lower()] = req.instructions
+    name = req.name.lower()
+    ctx.skills[name] = req.instructions
     ctx.save()
-    return SkillItem(name=req.name.lower(), instructions=req.instructions, is_preset=req.name in PRESETS)
+    return SkillItem(name=name, instructions=req.instructions, is_preset=name in PRESETS)
 
 
 @router.delete("/{name}")
