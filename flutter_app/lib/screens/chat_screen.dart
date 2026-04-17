@@ -151,7 +151,7 @@ class _MessageBubble extends StatelessWidget {
                     a,
                     style: TextStyle(
                       fontSize: 11,
-                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                      color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
                       fontStyle: FontStyle.italic,
                     ),
                   ),
