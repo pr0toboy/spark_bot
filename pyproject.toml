@@ -13,11 +13,13 @@ dependencies = [
     "prompt_toolkit",
     "requests",
     "ecdsa",
+    "fastapi",
+    "uvicorn[standard]",
 ]
 
 [tool.setuptools]
 py-modules = ["main", "bot", "context", "result"]
-packages = ["commands"]
+packages = ["commands", "app", "app.routes"]
 
 [project.scripts]
 spark = "main:main"

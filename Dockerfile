@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends nodejs npm \
 COPY pyproject.toml .
 COPY main.py bot.py context.py result.py ./
 COPY commands/ commands/
+COPY app/ app/
 
 RUN pip install --no-cache-dir .
 

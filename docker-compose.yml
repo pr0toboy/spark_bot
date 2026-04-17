@@ -14,5 +14,19 @@ services:
       # - ANTHROPIC_API_KEY=sk-ant-...
       # - GROQ_API_KEY=gsk_...
 
+  spark-api:
+    image: spark-bot
+    container_name: spark-api
+    restart: unless-stopped
+    depends_on:
+      - spark
+    ports:
+      - "8000:8000"
+    volumes:
+      - spark_data:/data
+    environment:
+      - SPARK_DATA_DIR=/data
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
 volumes:
   spark_data:
