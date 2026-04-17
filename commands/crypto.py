@@ -4,40 +4,52 @@ import hmac as _hmac
 import sqlite3
 import struct
 import requests
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+from ecdsa import SECP256k1 as _CURVE
+from ecdsa.ellipticcurve import PointJacobi as _PJ
+
 from context import get_conn
 from result import Result
 
-_CG  = "https://api.coingecko.com/api/v3"
-_HDR = {"Accept": "application/json", "User-Agent": "SparkBot/1.0"}
+# ── Constantes ────────────────────────────────────────────────────────────────
+
+_CG       = "https://api.coingecko.com/api/v3"
+_HDR      = {"Accept": "application/json", "User-Agent": "SparkBot/1.0"}
 _JSON_HDR = {**_HDR, "Content-Type": "application/json"}
 
+_B58  = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+_BC32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+
 _IDS = {
-    "btc": "bitcoin", "eth": "ethereum", "sol": "solana", "bnb": "binancecoin",
-    "xrp": "ripple", "ada": "cardano", "doge": "dogecoin", "dot": "polkadot",
-    "avax": "avalanche-2", "matic": "matic-network", "link": "chainlink",
-    "ltc": "litecoin", "uni": "uniswap", "atom": "cosmos", "near": "near",
-    "trx": "tron", "shib": "shiba-inu", "pepe": "pepe", "op": "optimism",
-    "arb": "arbitrum", "sui": "sui", "apt": "aptos",
+    "btc": "bitcoin",    "eth": "ethereum",    "sol": "solana",
+    "bnb": "binancecoin","xrp": "ripple",      "ada": "cardano",
+    "doge": "dogecoin",  "dot": "polkadot",    "avax": "avalanche-2",
+    "matic": "matic-network", "link": "chainlink", "ltc": "litecoin",
+    "uni": "uniswap",    "atom": "cosmos",     "near": "near",
+    "trx": "tron",       "shib": "shiba-inu",  "pepe": "pepe",
+    "op": "optimism",    "arb": "arbitrum",    "sui": "sui", "apt": "aptos",
 }
-
-# chain → CoinGecko ID
-_CHAIN_COIN = {
-    "btc": "bitcoin", "xpub": "bitcoin",
-    "eth": "ethereum",
-    "avax": "avalanche-2",
-    "sol": "solana",
-    "dot": "polkadot",
-}
-
-# CSV ticker → chain (Ledger Live export)
+_CHAIN_COIN   = {"btc": "bitcoin", "xpub": "bitcoin", "eth": "ethereum",
+                 "avax": "avalanche-2", "sol": "solana", "dot": "polkadot"}
+_CHAIN_SYM    = {"btc": "₿", "xpub": "₿", "eth": "Ξ",
+                 "avax": "▲", "sol": "◎", "dot": "●"}
+_CHAIN_TICKER = {"btc": "BTC", "xpub": "BTC", "eth": "ETH",
+                 "avax": "AVAX", "sol": "SOL", "dot": "DOT"}
 _TICKER_CHAIN = {
-    "BTC": "xpub",   # Ledger exports xpub for BTC
-    "ETH": "eth", "MATIC": "eth", "BNB": "eth", "OP": "eth",
-    "AVAX": "avax",
-    "SOL": "sol",
-    "DOT": "dot",
+    "BTC": "xpub", "ETH": "eth", "MATIC": "eth", "BNB": "eth", "OP": "eth",
+    "AVAX": "avax", "SOL": "sol", "DOT": "dot",
 }
+
+_SOL_RPC   = "https://api.mainnet-beta.solana.com"
+_STAKE_PRG = "Stake11111111111111111111111111111111111111"
+
+# One-time DB migration flag (reset on process restart, migrations are idempotent)
+_DB_READY = False
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _cg_id(coin: str) -> str:
     return _IDS.get(coin.lower(), coin.lower())
@@ -48,46 +60,53 @@ def _fmt(usd: float) -> str:
     if usd >= 0.0001: return f"${usd:.6f}"
     return f"${usd:.2e}"
 
-_CHAIN_SYM = {"btc": "₿", "xpub": "₿", "eth": "Ξ", "avax": "▲", "sol": "◎", "dot": "●"}
+def _b58_decode(s: str) -> bytes:
+    n = 0
+    for c in s: n = n * 58 + _B58.index(c)
+    leading = len(s) - len(s.lstrip("1"))
+    return b"\x00" * leading + n.to_bytes((n.bit_length() + 7) // 8 or 1, "big")
 
 
 # ── DB ────────────────────────────────────────────────────────────────────────
 
 def _conn():
+    global _DB_READY
     c = get_conn()
     c.execute("""CREATE TABLE IF NOT EXISTS crypto_wallets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         label TEXT NOT NULL UNIQUE,
         address TEXT NOT NULL,
         chain TEXT NOT NULL)""")
-    # Migrate pre-existing table that had a restrictive CHECK constraint
-    row = c.execute(
-        "SELECT sql FROM sqlite_master WHERE type='table' AND name='crypto_wallets'"
-    ).fetchone()
-    if row and "CHECK" in row[0]:
-        c.execute("ALTER TABLE crypto_wallets RENAME TO _cw_old")
-        c.execute("""CREATE TABLE crypto_wallets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            label TEXT NOT NULL UNIQUE,
-            address TEXT NOT NULL,
-            chain TEXT NOT NULL)""")
-        c.execute("INSERT INTO crypto_wallets SELECT * FROM _cw_old")
-        c.execute("DROP TABLE _cw_old")
-    # Migrate AVAX wallets stored as 'eth' (from old import)
-    c.execute("""UPDATE crypto_wallets SET chain='avax'
-                 WHERE chain='eth' AND (LOWER(label) LIKE '%avalanche%'
-                                    OR LOWER(label) LIKE '%avax%')""")
     c.execute("""CREATE TABLE IF NOT EXISTS crypto_alerts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         coin TEXT NOT NULL,
         direction TEXT NOT NULL CHECK(direction IN ('above','below')),
         price REAL NOT NULL,
         active INTEGER NOT NULL DEFAULT 1)""")
+    if not _DB_READY:
+        # Drop old CHECK constraint on chain column (one-shot)
+        row = c.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='crypto_wallets'"
+        ).fetchone()
+        if row and "CHECK" in row[0]:
+            c.execute("ALTER TABLE crypto_wallets RENAME TO _cw_old")
+            c.execute("""CREATE TABLE crypto_wallets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                label TEXT NOT NULL UNIQUE,
+                address TEXT NOT NULL,
+                chain TEXT NOT NULL)""")
+            c.execute("INSERT INTO crypto_wallets SELECT * FROM _cw_old")
+            c.execute("DROP TABLE _cw_old")
+        # Migrate AVAX wallets imported as 'eth'
+        c.execute("""UPDATE crypto_wallets SET chain='avax'
+                     WHERE chain='eth'
+                     AND (LOWER(label) LIKE '%avalanche%' OR LOWER(label) LIKE '%avax%')""")
+        _DB_READY = True
     c.commit()
     return c
 
 
-# ── Balances ──────────────────────────────────────────────────────────────────
+# ── Prix ──────────────────────────────────────────────────────────────────────
 
 def _prices(coin_ids: list[str]) -> dict[str, dict]:
     if not coin_ids:
@@ -104,25 +123,15 @@ def _prices(coin_ids: list[str]) -> dict[str, dict]:
 def _price_one(coin_id: str) -> dict | None:
     return _prices([coin_id]).get(coin_id)
 
+
+# ── Balances BTC ──────────────────────────────────────────────────────────────
+
 def _btc_balance(addr: str) -> float | None:
     try:
         r = requests.get(f"https://blockchain.info/q/addressbalance/{addr}", timeout=8)
         return int(r.text.strip()) / 1e8
     except Exception:
         return None
-
-# ── BIP32 / bech32 helpers (xpub balance) ────────────────────────────────────
-
-_B58C = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-_BC32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
-
-def _b58decode_check(s: str) -> bytes:
-    n = 0
-    for c in s: n = n * 58 + _B58C.index(c)
-    leading = len(s) - len(s.lstrip("1"))
-    raw = b"\x00" * leading + n.to_bytes((n.bit_length() + 7) // 8 or 1, "big")
-    assert hashlib.sha256(hashlib.sha256(raw[:-4]).digest()).digest()[:4] == raw[-4:]
-    return raw[4:-4]  # strip 4-byte version and checksum
 
 def _bech32_polymod(vals: list) -> int:
     GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
@@ -143,92 +152,76 @@ def _convertbits(data: bytes, fb: int, tb: int) -> list:
     return ret
 
 def _p2wpkh_address(pubkey: bytes) -> str:
-    """Compressed pubkey → native SegWit bc1 address."""
     h160 = hashlib.new("ripemd160", hashlib.sha256(pubkey).digest()).digest()
     data = [0] + _convertbits(h160, 8, 5)
     hrp  = "bc"
     pre  = [ord(c) >> 5 for c in hrp] + [0] + [ord(c) & 31 for c in hrp]
     chk  = _bech32_polymod(pre + data + [0] * 6) ^ 1
-    enc  = "".join(_BC32[(chk >> (5 * (5 - i))) & 31] for i in range(6))
-    return hrp + "1" + "".join(_BC32[d] for d in data) + enc
+    return hrp + "1" + "".join(_BC32[d] for d in data) + \
+           "".join(_BC32[(chk >> (5 * (5 - i))) & 31] for i in range(6))
 
 def _ckd_pub(chaincode: bytes, pubkey: bytes, index: int) -> tuple[bytes, bytes]:
-    """BIP32 child key derivation (public → public)."""
-    from ecdsa import SECP256k1
-    from ecdsa.ellipticcurve import PointJacobi
     h  = _hmac.new(chaincode, pubkey + struct.pack(">I", index), hashlib.sha512).digest()
     il, ir = int.from_bytes(h[:32], "big"), h[32:]
-    G     = SECP256k1.generator
-    curve = SECP256k1.curve
-    p     = curve.p()
-    # Decompress parent pubkey
+    G  = _CURVE.generator
+    c  = _CURVE.curve
+    p  = c.p()
     pf, px = pubkey[0], int.from_bytes(pubkey[1:], "big")
-    y2 = (pow(px, 3, p) + curve.a() * px + curve.b()) % p
+    y2 = (pow(px, 3, p) + c.a() * px + c.b()) % p
     py = pow(y2, (p + 1) // 4, p)
     if (py % 2) != (pf - 2): py = p - py
-    parent_pt = PointJacobi(curve, px, py, 1)
-    child_pt  = il * G + parent_pt
-    cx, cy = int(child_pt.x()), int(child_pt.y())
-    cpub = bytes([2 if cy % 2 == 0 else 3]) + cx.to_bytes(32, "big")
-    return ir, cpub
+    pt = il * G + _PJ(c, px, py, 1)
+    cx, cy = int(pt.x()), int(pt.y())
+    return ir, bytes([2 if cy % 2 == 0 else 3]) + cx.to_bytes(32, "big")
 
 def _btc_xpub_balance(xpub: str) -> float | None:
-    """Derive P2WPKH addresses from xpub and query balances via mempool.space."""
     try:
-        raw      = _b58decode_check(xpub)       # 78 bytes without version/checksum
-        chaincode = raw[9:41]
-        pubkey    = raw[41:]
-
-        # Derive m/0 (external) and m/1 (change) branches
-        ext_cc, ext_pk = _ckd_pub(chaincode, pubkey, 0)
-        chg_cc, chg_pk = _ckd_pub(chaincode, pubkey, 1)
-
-        addrs: list[str] = []
-        for i in range(20):    # 20 external
-            _, pk = _ckd_pub(ext_cc, ext_pk, i)
-            addrs.append(_p2wpkh_address(pk))
-        for i in range(10):    # 10 change
-            _, pk = _ckd_pub(chg_cc, chg_pk, i)
-            addrs.append(_p2wpkh_address(pk))
-
+        raw  = _b58_decode(xpub)[4:-4]   # strip 4-byte version + 4-byte checksum
+        cc, pk = raw[9:41], raw[41:]
         total = 0.0
-        for addr in addrs:
-            r = requests.get(f"https://mempool.space/api/address/{addr}",
-                             headers=_HDR, timeout=8)
-            if r.status_code != 200:
-                continue
-            cs = r.json().get("chain_stats", {})
-            total += (cs.get("funded_txo_sum", 0) - cs.get("spent_txo_sum", 0)) / 1e8
+        GAP   = 10  # BIP44 gap limit
+        for branch in (0, 1):
+            bcc, bpk = _ckd_pub(cc, pk, branch)
+            gap = 0
+            for i in range(50):
+                _, cpk = _ckd_pub(bcc, bpk, i)
+                r = requests.get(f"https://mempool.space/api/address/{_p2wpkh_address(cpk)}",
+                                 headers=_HDR, timeout=8)
+                if r.status_code != 200:
+                    gap += 1
+                    if gap >= GAP: break
+                    continue
+                cs  = r.json().get("chain_stats", {})
+                total += (cs.get("funded_txo_sum", 0) - cs.get("spent_txo_sum", 0)) / 1e8
+                gap = 0 if cs.get("tx_count", 0) else gap + 1
+                if gap >= GAP: break
         return total
     except Exception:
         return None
 
+
+# ── Balances ETH / AVAX ───────────────────────────────────────────────────────
+
 def _eth_balance(addr: str) -> float | None:
-    # BlockScout public API — no key required
     try:
-        r = requests.get(
-            f"https://eth.blockscout.com/api/v2/addresses/{addr}",
-            headers=_HDR, timeout=8,
-        )
+        r = requests.get(f"https://eth.blockscout.com/api/v2/addresses/{addr}",
+                         headers=_HDR, timeout=8)
         return int(r.json()["coin_balance"]) / 1e18 if r.status_code == 200 else None
     except Exception:
         return None
 
 def _avax_balance(addr: str) -> float | None:
-    # Avalanche C-Chain public RPC — eth_getBalance, no key required
     try:
-        r = requests.post(
-            "https://api.avax.network/ext/bc/C/rpc",
+        r = requests.post("https://api.avax.network/ext/bc/C/rpc",
             json={"jsonrpc": "2.0", "id": 1,
                   "method": "eth_getBalance", "params": [addr, "latest"]},
-            headers=_JSON_HDR, timeout=8,
-        )
+            headers=_JSON_HDR, timeout=8)
         return int(r.json()["result"], 16) / 1e18
     except Exception:
         return None
 
-_SOL_RPC   = "https://api.mainnet-beta.solana.com"
-_STAKE_PRG = "Stake11111111111111111111111111111111111111"
+
+# ── Balance SOL (liquid + staké) ──────────────────────────────────────────────
 
 def _sol_rpc(method: str, params: list) -> dict:
     r = requests.post(_SOL_RPC,
@@ -237,13 +230,10 @@ def _sol_rpc(method: str, params: list) -> dict:
     return r.json()
 
 def _sol_balance(addr: str) -> float | None:
-    """SOL balance = liquid + all stake accounts found in transaction history."""
     try:
         liquid = _sol_rpc("getBalance", [addr])["result"]["value"] / 1e9
-
-        # Discover stake accounts by scanning recent transactions
-        sigs = [s["signature"] for s in
-                _sol_rpc("getSignaturesForAddress", [addr, {"limit": 100}]).get("result", [])]
+        sigs   = [s["signature"] for s in
+                  _sol_rpc("getSignaturesForAddress", [addr, {"limit": 50}]).get("result", [])]
         candidates: set[str] = set()
         for sig in sigs:
             tx = _sol_rpc("getTransaction",
@@ -252,92 +242,84 @@ def _sol_balance(addr: str) -> float | None:
                 continue
             meta = tx["meta"]
             for i, acc in enumerate(tx["transaction"]["message"]["accountKeys"]):
-                if acc in (addr, _STAKE_PRG):
-                    continue
-                post = meta["postBalances"][i] if i < len(meta["postBalances"]) else 0
-                if post >= 500_000_000:  # ≥ 0.5 SOL — likely a stake account
+                if acc in (addr, _STAKE_PRG): continue
+                if meta["postBalances"][i] >= 500_000_000:
                     candidates.add(acc)
-
         staked = 0.0
         for acc in candidates:
             v = _sol_rpc("getAccountInfo", [acc, {"encoding": "base64"}]).get("result", {}).get("value")
             if v and v.get("owner") == _STAKE_PRG:
                 staked += v["lamports"] / 1e9
-
         return liquid + staked
     except Exception:
         return None
 
-_B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
-def _ss58_pubkey(addr: str) -> bytes:
-    """Decode SS58 address → 32-byte public key (prefix 0-63)."""
-    n = 0
-    for c in addr:
-        n = n * 58 + _B58.index(c)
-    leading = len(addr) - len(addr.lstrip("1"))
-    raw = b"\x00" * leading + n.to_bytes((n.bit_length() + 7) // 8 or 1, "big")
-    return raw[1:33]  # skip 1-byte prefix, skip 2-byte checksum
+# ── Balance DOT ───────────────────────────────────────────────────────────────
 
 def _dot_balance(addr: str) -> float | None:
-    """Balance via Polkadot public RPC — no API key required."""
     try:
-        import hashlib
-        pubkey = _ss58_pubkey(addr)
-        # System.Account storage key = twox128("System") + twox128("Account") + blake2_128_concat(pubkey)
-        TW = "26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9"
-        b2  = hashlib.blake2b(pubkey, digest_size=16).digest().hex()
-        key = "0x" + TW + b2 + pubkey.hex()
-        r   = requests.post(
-            "https://rpc.polkadot.io",
+        raw    = _b58_decode(addr)
+        pubkey = raw[1:33]                 # SS58: 1-byte prefix + 32-byte pubkey + 2-byte checksum
+        TW     = "26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9"
+        key    = "0x" + TW + hashlib.blake2b(pubkey, digest_size=16).digest().hex() + pubkey.hex()
+        r = requests.post("https://rpc.polkadot.io",
             json={"jsonrpc": "2.0", "id": 1, "method": "state_getStorage", "params": [key]},
-            headers=_JSON_HDR, timeout=8,
-        )
+            headers=_JSON_HDR, timeout=8)
         result = r.json().get("result")
         if not result:
-            return 0.0  # account never activated or cleaned up
-        raw = bytes.fromhex(result[2:])
-        # AccountInfo SCALE layout: nonce(4)+consumers(4)+providers(4)+sufficients(4)+free(16)+…
-        return int.from_bytes(raw[16:32], "little") / 1e10  # 1 DOT = 10^10 Planck
+            return 0.0
+        raw_data = bytes.fromhex(result[2:])
+        return int.from_bytes(raw_data[16:32], "little") / 1e10   # 1 DOT = 10^10 Planck
     except Exception:
         return None
 
+
+# ── Dispatch ──────────────────────────────────────────────────────────────────
+
 def _get_balance(addr: str, chain: str) -> float | None:
-    if chain == "btc":  return _btc_balance(addr)
-    if chain == "xpub": return _btc_xpub_balance(addr)
-    if chain == "eth":  return _eth_balance(addr)
-    if chain == "avax": return _avax_balance(addr)
-    if chain == "sol":  return _sol_balance(addr)
-    if chain == "dot":  return _dot_balance(addr)
-    return None
+    return {
+        "btc":  _btc_balance,
+        "xpub": _btc_xpub_balance,
+        "eth":  _eth_balance,
+        "avax": _avax_balance,
+        "sol":  _sol_balance,
+        "dot":  _dot_balance,
+    }.get(chain, lambda _: None)(addr)
 
 def _detect_chain(addr: str) -> str | None:
     a = addr.strip()
-    if a.startswith("xpub"):                              return "xpub"
-    if a.lower().startswith("0x") and len(a) == 42:       return "eth"
-    if a.startswith("bc1") and len(a) <= 74:              return "btc"
-    if a.startswith(("1", "3")) and len(a) <= 34:         return "btc"
-    if 43 <= len(a) <= 44:                                return "sol"
-    if a.startswith("1") and 46 <= len(a) <= 50:          return "dot"
+    if a.startswith("xpub"):                        return "xpub"
+    if a.lower().startswith("0x") and len(a) == 42: return "eth"
+    if a.startswith("bc1") and len(a) <= 74:        return "btc"
+    if a.startswith(("1", "3")) and len(a) <= 34:   return "btc"
+    if 43 <= len(a) <= 44:                          return "sol"
+    if a.startswith("1") and 46 <= len(a) <= 50:    return "dot"
     return None
 
 
 # ── Rendu wallet ──────────────────────────────────────────────────────────────
 
-def _wallet_line(label: str, address: str, chain: str, price_cache: dict) -> str:
-    short  = address[:8] + "…" + address[-4:]
-    sym    = _CHAIN_SYM.get(chain, "?")
-    cid    = _CHAIN_COIN.get(chain)
-    p      = price_cache.get(cid, {}) if cid else {}
-    bal    = _get_balance(address, chain)
-    ticker   = {"btc": "BTC", "xpub": "BTC", "eth": "ETH",
-                "avax": "AVAX", "sol": "SOL", "dot": "DOT"}.get(chain, chain.upper())
-    decimals = 6 if chain in ("btc", "xpub") else 4
-    bal_s = f"{bal:.{decimals}f} {ticker}" if bal is not None else "⚠ indisponible"
-
+def _wallet_line(label: str, address: str, chain: str, cache: dict, bal: float | None) -> str:
+    short = address[:8] + "…" + address[-4:]
+    sym   = _CHAIN_SYM.get(chain, "?")
+    p     = cache.get(_CHAIN_COIN.get(chain, ""), {})
+    dec   = 6 if chain in ("btc", "xpub") else 4
+    bal_s = f"{bal:.{dec}f} {_CHAIN_TICKER.get(chain, chain.upper())}" \
+            if bal is not None else "⚠ indisponible"
     if bal is not None and p.get("usd"):
         return f"  {sym}  {label} ({short}) — {bal_s} ≈ {_fmt(bal * p['usd'])}"
     return f"  {sym}  {label} ({short}) — {bal_s}"
+
+def _fetch_wallets(rows: list) -> tuple[dict, dict]:
+    """Fetch prices and balances in parallel. Returns (price_cache, {(addr,chain): bal})."""
+    needed = list({_CHAIN_COIN[ch] for _, _, ch in rows if ch in _CHAIN_COIN})
+    with ThreadPoolExecutor(max_workers=len(rows) + 1) as ex:
+        price_fut = ex.submit(_prices, needed)
+        bal_futs  = {(a, ch): ex.submit(_get_balance, a, ch) for _, a, ch in rows}
+        cache = price_fut.result()
+        bals  = {k: f.result() for k, f in bal_futs.items()}
+    return cache, bals
 
 
 # ── Sous-commandes ────────────────────────────────────────────────────────────
@@ -346,9 +328,8 @@ def _cmd_price(args: list) -> Result:
     if not args:
         return Result.error("Usage : /crypto price <coin>  (ex: btc, eth, sol)")
     coin = args[0].lower()
-    cid  = _cg_id(coin)
     print(f"📡 Prix {coin.upper()}…")
-    d = _price_one(cid)
+    d = _price_one(_cg_id(coin))
     if not d:
         return Result.error(f"❌ Coin « {coin} » introuvable.")
     chg  = d.get("usd_24h_change") or 0
@@ -393,13 +374,13 @@ def _cmd_wallet_add(args: list) -> Result:
         return Result.error("❌ Adresse non reconnue (BTC/xpub, ETH 0x…, SOL 44c, DOT 48c).")
     c = _conn()
     try:
-        c.execute("INSERT INTO crypto_wallets (label,address,chain) VALUES (?,?,?)", (label, address, chain))
+        c.execute("INSERT INTO crypto_wallets (label,address,chain) VALUES (?,?,?)",
+                  (label, address, chain))
         c.commit()
     except sqlite3.IntegrityError:
         c.close(); return Result.error(f"❌ Label « {label} » déjà utilisé.")
     c.close()
-    sym = _CHAIN_SYM.get(chain, chain.upper())
-    return Result.success(f"{sym}  Wallet « {label} » ({chain.upper()}) ajouté.")
+    return Result.success(f"{_CHAIN_SYM.get(chain, chain.upper())}  Wallet « {label} » ({chain.upper()}) ajouté.")
 
 
 def _cmd_wallet_list() -> Result:
@@ -409,10 +390,10 @@ def _cmd_wallet_list() -> Result:
     if not rows:
         return Result.success("Aucun wallet — /crypto wallet add <adresse> <label>")
     print("🔍 Balances…")
-    needed = list({_CHAIN_COIN[ch] for _, _, ch in rows if ch in _CHAIN_COIN})
-    cache  = _prices(needed)
-    lines  = [f"💼 Portfolio ({len(rows)}) :"]
-    lines += [_wallet_line(l, a, ch, cache) for l, a, ch in rows]
+    cache, bals = _fetch_wallets(rows)
+    lines = [f"💼 Portfolio ({len(rows)}) :"] + [
+        _wallet_line(l, a, ch, cache, bals[(a, ch)]) for l, a, ch in rows
+    ]
     return Result.success("\n".join(lines))
 
 
@@ -434,21 +415,17 @@ def _cmd_import(args: list) -> Result:
     if not path.exists():
         return Result.error(f"❌ Fichier introuvable : {path}")
 
-    seen: dict[str, tuple[str, str]] = {}   # address → (label, chain)
-    skipped_tickers: set[str] = set()
-
+    seen: dict[str, tuple[str, str]] = {}
+    skipped: set[str] = set()
     with open(path, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             addr   = row["Account xpub"].strip()
             name   = row["Account Name"].strip()
             ticker = row["Currency Ticker"].strip().upper()
-            if addr in seen:
-                continue
+            if addr in seen: continue
             chain = _TICKER_CHAIN.get(ticker)
             if chain is None:
-                skipped_tickers.add(ticker)
-                continue
-            # BTC: only add if it's actually an xpub (not a raw address)
+                skipped.add(ticker); continue
             if ticker == "BTC" and not addr.startswith("xpub"):
                 chain = "btc"
             seen[addr] = (name, chain)
@@ -462,16 +439,15 @@ def _cmd_import(args: list) -> Result:
         try:
             c.execute("INSERT INTO crypto_wallets (label,address,chain) VALUES (?,?,?)",
                       (label, address, chain))
-            sym = _CHAIN_SYM.get(chain, chain.upper())
-            added.append(f"  ✓ {sym}  {label} ({chain.upper()})")
+            added.append(f"  ✓ {_CHAIN_SYM.get(chain, chain.upper())}  {label} ({chain.upper()})")
         except sqlite3.IntegrityError:
             dupes.append(f"  ⚠ {label} — déjà présent")
     c.commit(); c.close()
 
     lines = [f"📥 Import Ledger : {len(added)} ajouté(s), {len(dupes)} ignoré(s)"]
     lines += added + dupes
-    if skipped_tickers:
-        lines.append(f"  ℹ tickers ignorés (non supportés) : {', '.join(sorted(skipped_tickers))}")
+    if skipped:
+        lines.append(f"  ℹ tickers ignorés : {', '.join(sorted(skipped))}")
     lines.append("\nTape /crypto pour voir les balances.")
     return Result.success("\n".join(lines))
 
@@ -486,14 +462,16 @@ def _cmd_alert_add(args: list) -> Result:
         price = float(args[2].replace(",", ""))
     except ValueError:
         return Result.error(f"❌ Prix invalide : {args[2]}")
-    cid = _cg_id(coin)
-    c   = _conn()
-    c.execute("INSERT INTO crypto_alerts (coin,direction,price) VALUES (?,?,?)", (cid, direction, price))
+    c  = _conn()
+    c.execute("INSERT INTO crypto_alerts (coin,direction,price) VALUES (?,?,?)",
+              (_cg_id(coin), direction, price))
     c.commit()
-    aid   = c.execute("SELECT last_insert_rowid()").fetchone()[0]
+    aid = c.execute("SELECT last_insert_rowid()").fetchone()[0]
     c.close()
-    dir_s = "au-dessus de" if direction == "above" else "en-dessous de"
-    return Result.success(f"🔔 Alerte #{aid} : {coin.upper()} {dir_s} {_fmt(price)}")
+    return Result.success(
+        f"🔔 Alerte #{aid} : {coin.upper()} "
+        f"{'au-dessus de' if direction == 'above' else 'en-dessous de'} {_fmt(price)}"
+    )
 
 
 def _cmd_alert_list() -> Result:
@@ -504,8 +482,10 @@ def _cmd_alert_list() -> Result:
         return Result.success("Aucune alerte — /crypto alert add <coin> <above|below> <prix>")
     lines = ["🔔 Alertes prix :"]
     for aid, coin, direction, price, active in rows:
-        status = "✅" if active else "⛔"
-        lines.append(f"  {status} #{aid}  {coin.upper()} {'>' if direction=='above' else '<'} {_fmt(price)}")
+        lines.append(
+            f"  {'✅' if active else '⛔'} #{aid}  "
+            f"{coin.upper()} {'>' if direction == 'above' else '<'} {_fmt(price)}"
+        )
     return Result.success("\n".join(lines))
 
 
@@ -530,8 +510,7 @@ def _cmd_alert_check() -> Result:
     if not rows:
         return Result.success("Aucune alerte active.")
     print("📡 Vérification des alertes…")
-    coin_ids = list({r[1] for r in rows})
-    live     = _prices(coin_ids)
+    live = _prices(list({r[1] for r in rows}))
     triggered, waiting = [], []
     c = _conn()
     for aid, coin, direction, target in rows:
@@ -539,10 +518,10 @@ def _cmd_alert_check() -> Result:
         if cur_price is None:
             waiting.append(f"  ⚠  #{aid} {coin.upper()} — prix indisponible")
             continue
-        hit = (direction == "above" and cur_price >= target) or \
-              (direction == "below" and cur_price <= target)
-        op  = ">" if direction == "above" else "<"
+        op   = ">" if direction == "above" else "<"
         line = f"  #{aid}  {coin.upper()} {_fmt(cur_price)} {op} {_fmt(target)}"
+        hit  = (direction == "above" and cur_price >= target) or \
+               (direction == "below" and cur_price <= target)
         if hit:
             c.execute("UPDATE crypto_alerts SET active=0 WHERE id=?", (aid,))
             triggered.append(f"🚨 {line}  ← DÉCLENCHÉE")
@@ -565,22 +544,23 @@ def _cmd_portfolio() -> Result:
 
     if wallets:
         print("🔍 Balances…")
-        needed = list({_CHAIN_COIN[ch] for _, _, ch in wallets if ch in _CHAIN_COIN})
-        cache  = _prices(needed)
-        lines += ["", f"💼 Wallets ({len(wallets)}) :"]
-        lines += [_wallet_line(l, a, ch, cache) for l, a, ch in wallets]
+        cache, bals = _fetch_wallets(wallets)
+        lines += ["", f"💼 Wallets ({len(wallets)}) :"] + [
+            _wallet_line(l, a, ch, cache, bals[(a, ch)]) for l, a, ch in wallets
+        ]
     else:
         lines.append("  Aucun wallet — /crypto wallet add <adresse> <label>")
 
     print("📡 Prix…")
-    top_ids = ["bitcoin", "ethereum", "avalanche-2", "solana", "polkadot"]
-    mkt     = _prices(top_ids)
-    lines  += ["", "💹 Marché :"]
-    for sym, cid in [("BTC","bitcoin"),("ETH","ethereum"),("AVAX","avalanche-2"),("SOL","solana"),("DOT","polkadot")]:
+    top  = ["bitcoin", "ethereum", "avalanche-2", "solana", "polkadot"]
+    mkt  = _prices(top)
+    lines += ["", "💹 Marché :"]
+    for sym, cid in [("BTC","bitcoin"),("ETH","ethereum"),("AVAX","avalanche-2"),
+                     ("SOL","solana"),("DOT","polkadot")]:
         d = mkt.get(cid)
         if d:
             chg = d.get("usd_24h_change") or 0
-            lines.append(f"  {sym:<4} {_fmt(d['usd'])}  {'▲' if chg>=0 else '▼'} {chg:+.2f}%")
+            lines.append(f"  {sym:<4} {_fmt(d['usd'])}  {'▲' if chg >= 0 else '▼'} {chg:+.2f}%")
 
     if n_alerts:
         lines += ["", f"🔔 {n_alerts} alerte(s) active(s) — /crypto alert check"]
@@ -596,7 +576,6 @@ def handle(ctx, user_input: str) -> Result:
         return _cmd_portfolio()
 
     sub = parts[0].lower()
-
     if sub == "price":  return _cmd_price(parts[1:])
     if sub == "news":   return _cmd_news()
     if sub == "import": return _cmd_import(parts[1:])
