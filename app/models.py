@@ -47,15 +47,19 @@ class SkillItem(BaseModel):
 class SettingsUpdate(BaseModel):
     anthropic_api_key: str | None = None
     groq_api_key: str | None = None
+    glm_api_key: str | None = None
     anthropic_model: str | None = None
     groq_model: str | None = None
+    glm_model: str | None = None
 
 
 class SettingsResponse(BaseModel):
     anthropic_model: str
     groq_model: str
+    glm_model: str
     has_anthropic_key: bool
     has_groq_key: bool
+    has_glm_key: bool
 
 
 class ContextResponse(BaseModel):

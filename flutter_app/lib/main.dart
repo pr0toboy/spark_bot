@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/chat_screen.dart';
+import 'screens/commands_screen.dart';
 import 'screens/notes_screen.dart';
 import 'screens/settings_screen.dart';
 import 'services/api_service.dart';
@@ -39,6 +40,7 @@ class _ShellState extends State<_Shell> {
 
   static const _screens = [
     ChatScreen(),
+    CommandsScreen(),
     NotesScreen(),
     SettingsScreen(),
   ];
@@ -52,6 +54,7 @@ class _ShellState extends State<_Shell> {
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: 'Chat'),
+          NavigationDestination(icon: Icon(Icons.terminal_outlined), selectedIcon: Icon(Icons.terminal), label: 'Commandes'),
           NavigationDestination(icon: Icon(Icons.note_outlined), selectedIcon: Icon(Icons.note), label: 'Notes'),
           NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Paramètres'),
         ],

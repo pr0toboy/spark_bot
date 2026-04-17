@@ -71,7 +71,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
       if (confirmed != true || controller.text.trim().isEmpty) return;
       try {
-        final key = provider == 'anthropic' ? 'anthropic_api_key' : 'groq_api_key';
+        final key = provider == 'anthropic'
+            ? 'anthropic_api_key'
+            : provider == 'groq'
+                ? 'groq_api_key'
+                : 'glm_api_key';
         await _api.updateSettings({key: controller.text.trim()});
         await _load();
       } catch (e) {
@@ -167,6 +171,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _section('Clés API', [
             _keyTile('Anthropic', _settings['has_anthropic_key'] == true),
             _keyTile('Groq', _settings['has_groq_key'] == true),
+            _keyTile('GLM', _settings['has_glm_key'] == true),
           ]),
           _section('Outils', [
             for (final tool in _tools)

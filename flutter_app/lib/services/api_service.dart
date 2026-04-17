@@ -114,6 +114,8 @@ class ApiService {
     return data['message'] as String;
   }
 
+  Future<Map<String, dynamic>> getGraph() => _get('/api/notes/graph');
+
   // --- Tools ---
 
   Future<List<Map<String, dynamic>>> getTools() async {
