@@ -18,6 +18,7 @@ COMMANDS = [
     ("/weather",  "Afficher la météo actuelle"),
     ("/quote",    "Afficher une citation inspirante"),
     ("/crypto",   "Crypto : prix, wallets, alertes, tendances"),
+    ("/habit",    "Tracker d'habitudes  (add | check | stats | history | import)"),
     ("/help",     "Afficher cette aide  (ex: /help ai)"),
     ("/exit",     "Quitter Spark"),
 ]
@@ -154,6 +155,20 @@ DETAILS = {
   Chaînes supportées : BTC (adresse + xpub), ETH, SOL, DOT.
   Prix : CoinGecko (gratuit, sans clé).
   Balances : blockchain.info (BTC), Blockchair (xpub), Etherscan, Solana RPC, Subscan (DOT).""",
+
+    "habit": """\
+/habit — Tracker d'habitudes quotidiennes
+  /habit                          Vue d'ensemble (streak + grille 7 jours)
+  /habit add <nom> [<n>/<d>j]     Crée une habitude  (ex: Sport  ou  Lecture 3/7j)
+  /habit check <nom|id>           Coche l'habitude du jour  (alias : done)
+  /habit uncheck <nom|id>         Décoche l'habitude du jour
+  /habit stats [<nom|id>]         Stats hebdo/mensuel + streaks
+  /habit history <nom|id>         Historique des 30 derniers jours
+  /habit delete <nom|id>          Archive une habitude (données conservées)
+  /habit import [<fichier.db>]    Importe depuis un backup Loop Habits
+
+  Fréquences : 1/1j = quotidien (défaut), 3/7j = 3 fois par semaine.
+  Raccourci : /habit <nom> coche directement une habitude.""",
 
     "help": """\
 /help — Aide

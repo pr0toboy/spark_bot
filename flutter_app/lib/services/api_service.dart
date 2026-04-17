@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/crypto.dart';
+import '../models/habit.dart';
 import '../models/message.dart';
 import '../models/note.dart';
 import '../models/skill.dart';
@@ -196,6 +197,34 @@ class ApiService {
   }
 
   Future<void> deleteCryptoAlert(int id) => _delete('/api/crypto/alerts/$id');
+
+  // --- Habits ---
+
+  Future<List<Habit>> getHabits() async {
+    final list = await _getList('/api/habits');
+    return list.map((e) => Habit.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<Habit> createHabit(String name, {int freqNum = 1, int freqDen = 1}) async {
+    final data = await _post('/api/habits', {'name': name, 'freq_num': freqNum, 'freq_den': freqDen});
+    return Habit.fromJson(data);
+  }
+
+  Future<Map<String, dynamic>> checkHabit(int id) =>
+      _post('/api/habits/$id/check', {});
+
+  Future<Map<String, dynamic>> uncheckHabit(int id) async {
+    final res = await _client.delete(_url('/api/habits/$id/check'));
+    _checkStatus(res);
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  Future<HabitStats> getHabitStats(int id) async {
+    final data = await _get('/api/habits/$id/stats');
+    return HabitStats.fromJson(data);
+  }
+
+  Future<void> deleteHabit(int id) => _delete('/api/habits/$id');
 
   // --- Settings ---
 

@@ -125,3 +125,41 @@ class CryptoAlertCreate(BaseModel):
     coin: str = Field(min_length=1)
     direction: str
     price: float
+
+
+# ── Habits ────────────────────────────────────────────────────────────────────
+
+class HabitItem(BaseModel):
+    id: int
+    name: str
+    freq_num: int
+    freq_den: int
+    done_today: bool
+    streak: int
+    best_streak: int
+    week: list[bool]
+
+
+class HabitCreate(BaseModel):
+    name: str = Field(min_length=1)
+    freq_num: int = 1
+    freq_den: int = 1
+
+
+class HabitStats(BaseModel):
+    id: int
+    name: str
+    streak: int
+    best_streak: int
+    week_done: int
+    month_done: int
+    total: int
+    week: list[bool]
+
+
+class HabitCheckResult(BaseModel):
+    id: int
+    name: str
+    done_today: bool
+    streak: int
+    best_streak: int
