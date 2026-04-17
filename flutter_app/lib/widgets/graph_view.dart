@@ -44,20 +44,20 @@ class _GraphViewState extends State<GraphView> {
     _init();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final size = context.size;
-      if (size != null) {
-        _transformCtrl.value = Matrix4.identity()
-          ..translate(
-            (size.width - _canvasSize) / 2,
-            (size.height - _canvasSize) / 2,
-          );
-      }
+      if (size != null) _fitToNodes(size);
     });
   }
 
   @override
   void didUpdateWidget(GraphView old) {
     super.didUpdateWidget(old);
-    if (old.nodes != widget.nodes || old.edges != widget.edges) _init();
+    if (old.nodes != widget.nodes || old.edges != widget.edges) {
+      _init();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final size = context.size;
+        if (size != null) _fitToNodes(size);
+      });
+    }
   }
 
   @override
@@ -145,6 +145,32 @@ class _GraphViewState extends State<GraphView> {
       }
       temp *= 0.94;
     }
+  }
+
+  void _fitToNodes(Size viewSize) {
+    if (_nodes.isEmpty) return;
+    var minX = _nodes.first.position.dx;
+    var maxX = minX;
+    var minY = _nodes.first.position.dy;
+    var maxY = minY;
+    for (final n in _nodes) {
+      if (n.position.dx < minX) minX = n.position.dx;
+      if (n.position.dx > maxX) maxX = n.position.dx;
+      if (n.position.dy < minY) minY = n.position.dy;
+      if (n.position.dy > maxY) maxY = n.position.dy;
+    }
+    const padding = 80.0;
+    minX -= padding; maxX += padding;
+    minY -= padding; maxY += padding;
+    final contentW = max(maxX - minX, 1.0);
+    final contentH = max(maxY - minY, 1.0);
+    final s = min(viewSize.width / contentW, viewSize.height / contentH)
+        .clamp(0.15, 2.0);
+    final cx = (minX + maxX) / 2;
+    final cy = (minY + maxY) / 2;
+    _transformCtrl.value = Matrix4.identity()
+      ..translate(viewSize.width / 2 - cx * s, viewSize.height / 2 - cy * s)
+      ..scale(s);
   }
 
   GraphNode? _nodeAt(Offset canvasPos) {
