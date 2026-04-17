@@ -28,5 +28,8 @@ htmlcov/
 .vscode/
 .idea/
 
+# Claude Code session files
+.claude/
+
 # macOS
 .DS_Store

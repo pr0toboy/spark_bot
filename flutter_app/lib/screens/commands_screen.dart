@@ -77,7 +77,7 @@ const _sections = [
          input: _Input.text, hint1: 'Coin (btc, eth, sol…)'),
     _Cmd('/crypto news', 'Tendances',         'Tendances CoinGecko',          Icons.trending_up,    _kOrange),
   ]),
-_Section('Système', Icons.settings_applications_outlined, [
+  _Section('Système', Icons.settings_applications_outlined, [
     _Cmd('/model',       'Modèles actifs',    'Voir les modèles configurés',  Icons.smart_toy_outlined, _kPink),
     _Cmd('/model list',  'Lister modèles',    'Tous les modèles disponibles', Icons.list,           _kPink),
     _Cmd('/tools',       'Outils',            'Statut des outils actifs',     Icons.construction_outlined, _kPink),

@@ -2,10 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends nodejs npm \
-    && rm -rf /var/lib/apt/lists/* \
-    && npm install -g @anthropic-ai/claude-code \
-    && useradd -m -u 1000 spark \
+RUN useradd -m -u 1000 spark \
     && mkdir -p /data && chown spark:spark /data
 
 COPY pyproject.toml .
