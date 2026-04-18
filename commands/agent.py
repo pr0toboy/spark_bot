@@ -15,7 +15,7 @@ def _init_tables(conn):
         CREATE TABLE IF NOT EXISTS agents (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
             name             TEXT    NOT NULL,
-            type             TEXT    NOT NULL CHECK(type IN ('rss','web')),
+            type             TEXT    NOT NULL,
             config           TEXT    NOT NULL DEFAULT '{}',
             enabled          INTEGER NOT NULL DEFAULT 1,
             interval_minutes INTEGER NOT NULL DEFAULT 60,
@@ -100,6 +100,139 @@ def _fetch_web(url: str, prev_hash: str | None) -> tuple[list[dict], str]:
     return [{"title": "Changement détecté", "link": url, "published": "", "summary": r.text[:500]}], h
 
 
+def _fetch_email(config: dict) -> tuple[list[dict], int]:
+    import imaplib
+    import email as email_lib
+    from email.header import decode_header as dh
+
+    host = config.get("imap_host", "imap.gmail.com")
+    port = int(config.get("imap_port", 993))
+    username = config.get("username", "")
+    password = config.get("password", "")
+    folder = config.get("folder", "INBOX")
+    last_uid = int(config.get("last_uid", 0))
+
+    def _decode(s) -> str:
+        if not s:
+            return ""
+        parts = dh(s)
+        result = []
+        for part, enc in parts:
+            if isinstance(part, bytes):
+                result.append(part.decode(enc or "utf-8", errors="replace"))
+            else:
+                result.append(str(part))
+        return "".join(result)
+
+    def _body(msg) -> str:
+        if msg.is_multipart():
+            for part in msg.walk():
+                ct = part.get_content_type()
+                if ct == "text/plain" and not part.get("Content-Disposition"):
+                    try:
+                        return part.get_payload(decode=True).decode(
+                            part.get_content_charset() or "utf-8", errors="replace"
+                        )[:500]
+                    except Exception:
+                        pass
+        else:
+            try:
+                return msg.get_payload(decode=True).decode(
+                    msg.get_content_charset() or "utf-8", errors="replace"
+                )[:500]
+            except Exception:
+                pass
+        return ""
+
+    with imaplib.IMAP4_SSL(host, port) as imap:
+        imap.login(username, password)
+        imap.select(folder, readonly=True)
+
+        if last_uid:
+            _, data = imap.uid("search", None, f"UID {last_uid + 1}:*")
+        else:
+            _, data = imap.uid("search", None, "UNSEEN")
+
+        raw_uids = data[0].split() if data[0] else []
+        uids = [u for u in raw_uids if int(u) > last_uid]
+
+        if not uids:
+            return [], last_uid
+
+        batch = uids[-20:]
+        _, msg_data = imap.uid("fetch", b",".join(batch), "(RFC822)")
+
+        results = []
+        new_last_uid = last_uid
+        for i in range(0, len(msg_data), 2):
+            part = msg_data[i]
+            if not part or not isinstance(part, tuple):
+                continue
+            uid_int = int(batch[i // 2])
+            msg = email_lib.message_from_bytes(part[1])
+            subject = _decode(msg.get("Subject", "(Sans objet)"))
+            sender = _decode(msg.get("From", ""))
+            date = msg.get("Date", "")
+            body = _body(msg)
+            results.append({
+                "title": subject,
+                "link": f"email:uid:{uid_int}",
+                "published": date,
+                "summary": f"De : {sender}\n{body[:400]}",
+            })
+            new_last_uid = max(new_last_uid, uid_int)
+
+    return results, new_last_uid
+
+
+def _get_api_key(conn) -> str:
+    row = conn.execute("SELECT value FROM kv WHERE key='api_key'").fetchone()
+    if not row:
+        return ""
+    try:
+        val = json.loads(row[0])
+        return val if isinstance(val, str) else ""
+    except Exception:
+        return ""
+
+
+def _ai_filter(items: list[dict], ai_context: str, api_key: str) -> tuple[list[dict], str]:
+    """
+    Pass items through Claude for relevance analysis.
+    Returns (relevant_items, summary_or_analysis).
+    Returns ([], reason) if nothing relevant.
+    """
+    if not items or not ai_context.strip() or not api_key:
+        return items, f"{len(items)} résultat(s)"
+
+    try:
+        import anthropic
+        items_text = "\n".join([
+            f"[{i + 1}] {item.get('title', '(sans titre)')} — {item.get('summary', '')[:300]}"
+            for i, item in enumerate(items[:20])
+        ])
+        prompt = (
+            f"Tu analyses du contenu récent pour un utilisateur.\n"
+            f"Contexte de l'utilisateur : {ai_context}\n\n"
+            f"Contenu :\n{items_text}\n\n"
+            f"Y a-t-il des éléments pertinents pour l'utilisateur ?\n"
+            f"Si oui, fais un résumé concis (3-5 lignes max) des points importants.\n"
+            f"Si non, réponds uniquement : SKIP"
+        )
+        client = anthropic.Anthropic(api_key=api_key)
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=400,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        result = resp.content[0].text.strip()
+        if result.upper().startswith("SKIP"):
+            return [], "Rien de pertinent (filtré par IA)"
+        return items, result
+    except Exception as e:
+        return items, f"{len(items)} résultat(s) (filtre IA indisponible: {str(e)[:80]})"
+
+
 def run_agent(agent_id: int) -> dict:
     conn = get_conn()
     _init_tables(conn)
@@ -114,20 +247,41 @@ def run_agent(agent_id: int) -> dict:
     aid, name, atype, config_str = row
     config = json.loads(config_str)
 
+    items: list[dict] = []
+    summary = ""
+    status = "ok"
+    config_changed = False
+
     try:
         if atype == "rss":
             items = _fetch_rss(config.get("url", ""), config.get("keywords", []))
         elif atype == "web":
             items, new_hash = _fetch_web(config.get("url", ""), config.get("last_hash"))
-            config["last_hash"] = new_hash
+            if config.get("last_hash") != new_hash:
+                config["last_hash"] = new_hash
+                config_changed = True
+        elif atype == "email":
+            items, new_uid = _fetch_email(config)
+            if new_uid != int(config.get("last_uid", 0)):
+                config["last_uid"] = new_uid
+                config_changed = True
+
+        if config_changed:
             conn.execute(
                 "UPDATE agents SET config=? WHERE id=?",
                 (json.dumps(config, ensure_ascii=False), aid),
             )
+
+        # AI filter / analysis
+        ai_context = config.get("ai_context", "").strip()
+        if items and ai_context:
+            api_key = _get_api_key(conn)
+            items, summary = _ai_filter(items, ai_context, api_key)
         else:
-            items = []
+            summary = f"{len(items)} résultat(s)" if items else "Rien de nouveau"
+
         status = "ok" if items else "empty"
-        summary = f"{len(items)} résultat(s)" if items else "Rien de nouveau"
+
     except Exception as e:
         status, summary, items = "error", str(e)[:200], []
 

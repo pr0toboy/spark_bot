@@ -20,8 +20,16 @@ def _to_item(row) -> AgentItem:
     config = json.loads(row[3])
     return AgentItem(
         id=row[0], name=row[1], type=row[2],
-        url=config.get("url", ""), keywords=config.get("keywords", []),
-        enabled=bool(row[4]), interval_minutes=row[5], last_run=row[6],
+        url=config.get("url", ""),
+        keywords=config.get("keywords", []),
+        enabled=bool(row[4]),
+        interval_minutes=row[5],
+        last_run=row[6],
+        ai_context=config.get("ai_context", ""),
+        imap_host=config.get("imap_host", ""),
+        imap_port=config.get("imap_port", 993),
+        imap_username=config.get("username", ""),
+        imap_folder=config.get("folder", "INBOX"),
     )
 
 
@@ -53,10 +61,23 @@ def list_agents():
 @router.post("", response_model=AgentItem, status_code=201)
 def create_agent(req: AgentCreate):
     c = _conn()
-    config = json.dumps({"url": req.url, "keywords": req.keywords}, ensure_ascii=False)
+    config: dict = {
+        "url": req.url,
+        "keywords": req.keywords,
+        "ai_context": req.ai_context,
+    }
+    if req.type == "email":
+        config.update({
+            "imap_host": req.imap_host,
+            "imap_port": req.imap_port,
+            "username": req.imap_username,
+            "password": req.imap_password,
+            "folder": req.imap_folder,
+        })
     c.execute(
         "INSERT INTO agents (name, type, config, enabled, interval_minutes, created_at) VALUES (?,?,?,1,?,?)",
-        (req.name, req.type, config, req.interval_minutes, datetime.now(timezone.utc).isoformat()),
+        (req.name, req.type, json.dumps(config, ensure_ascii=False),
+         req.interval_minutes, datetime.now(timezone.utc).isoformat()),
     )
     c.commit()
     aid = c.execute("SELECT last_insert_rowid()").fetchone()[0]
@@ -84,6 +105,18 @@ def update_agent(agent_id: int, req: AgentUpdate):
         config["url"] = req.url
     if req.keywords is not None:
         config["keywords"] = req.keywords
+    if req.ai_context is not None:
+        config["ai_context"] = req.ai_context
+    if req.imap_host is not None:
+        config["imap_host"] = req.imap_host
+    if req.imap_port is not None:
+        config["imap_port"] = req.imap_port
+    if req.imap_username is not None:
+        config["username"] = req.imap_username
+    if req.imap_password is not None:
+        config["password"] = req.imap_password
+    if req.imap_folder is not None:
+        config["folder"] = req.imap_folder
     enabled = req.enabled if req.enabled is not None else bool(row[4])
     interval = req.interval_minutes if req.interval_minutes is not None else row[5]
     c.execute(

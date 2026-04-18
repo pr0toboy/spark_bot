@@ -40,6 +40,12 @@ class _AgentsScreenState extends State<AgentsScreen> {
     final nameCtrl = TextEditingController();
     final urlCtrl = TextEditingController();
     final kwCtrl = TextEditingController();
+    final aiCtxCtrl = TextEditingController();
+    final imapHostCtrl = TextEditingController(text: 'imap.gmail.com');
+    final imapPortCtrl = TextEditingController(text: '993');
+    final imapUserCtrl = TextEditingController();
+    final imapPassCtrl = TextEditingController();
+    final imapFolderCtrl = TextEditingController(text: 'INBOX');
     String type = 'rss';
     int interval = 60;
 
@@ -62,31 +68,87 @@ class _AgentsScreenState extends State<AgentsScreen> {
                   segments: const [
                     ButtonSegment(value: 'rss', label: Text('RSS')),
                     ButtonSegment(value: 'web', label: Text('Web')),
+                    ButtonSegment(value: 'email', label: Text('Email')),
                   ],
                   selected: {type},
                   onSelectionChanged: (s) => setS(() => type = s.first),
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: urlCtrl,
-                  keyboardType: TextInputType.url,
-                  decoration: InputDecoration(
-                    labelText: 'URL',
-                    hintText: type == 'rss'
-                        ? 'https://example.com/feed.xml'
-                        : 'https://example.com/changelog',
-                  ),
-                ),
-                if (type == 'rss') ...[
-                  const SizedBox(height: 12),
+
+if (type != 'email') ...[
                   TextField(
-                    controller: kwCtrl,
+                    controller: urlCtrl,
+                    keyboardType: TextInputType.url,
+                    decoration: InputDecoration(
+                      labelText: 'URL',
+                      hintText: type == 'rss'
+                          ? 'https://example.com/feed.xml'
+                          : 'https://example.com/changelog',
+                    ),
+                  ),
+                  if (type == 'rss') ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: kwCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Mots-clés (optionnel, séparés par virgules)',
+                        hintText: 'AI, LLM, Claude',
+                      ),
+                    ),
+                  ],
+                ],
+
+if (type == 'email') ...[
+                  TextField(
+                    controller: imapHostCtrl,
                     decoration: const InputDecoration(
-                      labelText: 'Mots-clés (séparés par des virgules)',
-                      hintText: 'AI, LLM, Claude',
+                      labelText: 'Serveur IMAP',
+                      hintText: 'imap.gmail.com',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: imapPortCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Port (993)'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: imapUserCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(labelText: 'Email / Identifiant'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: imapPassCtrl,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Mot de passe app',
+                      hintText: 'Mot de passe d\'application Gmail',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: imapFolderCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Dossier',
+                      hintText: 'INBOX',
                     ),
                   ),
                 ],
+
+const SizedBox(height: 12),
+                TextField(
+                  controller: aiCtxCtrl,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    labelText: 'Filtre IA (optionnel)',
+                    hintText: type == 'email'
+                        ? 'Ex : Signale les emails urgents et ignore les newsletters'
+                        : 'Ex : Je m\'intéresse à l\'IA et au développement mobile',
+                    helperText: 'Claude filtre et analyse le contenu selon ce contexte',
+                  ),
+                ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
                   value: interval,
@@ -121,25 +183,44 @@ class _AgentsScreenState extends State<AgentsScreen> {
 
     final name = nameCtrl.text.trim();
     final url = urlCtrl.text.trim();
+    final aiCtx = aiCtxCtrl.text.trim();
     final kw = kwCtrl.text
         .split(',')
         .map((s) => s.trim())
         .where((s) => s.isNotEmpty)
         .toList();
-    nameCtrl.dispose();
-    urlCtrl.dispose();
-    kwCtrl.dispose();
+    final imapHost = imapHostCtrl.text.trim();
+    final imapPort = int.tryParse(imapPortCtrl.text.trim()) ?? 993;
+    final imapUser = imapUserCtrl.text.trim();
+    final imapPass = imapPassCtrl.text;
+    final imapFolder = imapFolderCtrl.text.trim();
+
+    for (final c in [
+      nameCtrl, urlCtrl, kwCtrl, aiCtxCtrl,
+      imapHostCtrl, imapPortCtrl, imapUserCtrl, imapPassCtrl, imapFolderCtrl
+    ]) {
+      c.dispose();
+    }
 
     if (confirmed != true) return;
 
     try {
-      await _api.createAgent({
+      final body = <String, dynamic>{
         'name': name,
         'type': type,
         'url': url,
         'keywords': kw,
         'interval_minutes': interval,
-      });
+        'ai_context': aiCtx,
+      };
+      if (type == 'email') {
+        body['imap_host'] = imapHost;
+        body['imap_port'] = imapPort;
+        body['imap_username'] = imapUser;
+        body['imap_password'] = imapPass;
+        body['imap_folder'] = imapFolder;
+      }
+      await _api.createAgent(body);
       await _load();
     } catch (e) {
       _showError(e.toString());
@@ -311,7 +392,15 @@ class _AgentsScreenState extends State<AgentsScreen> {
   }
 }
 
-// ── Tiles ─────────────────────────────────────────────────────────────────────
+String _fmtDate(String iso) {
+  try {
+    final d = DateTime.parse(iso).toLocal();
+    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')} '
+        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+  } catch (_) {
+    return iso;
+  }
+}
 
 class _AgentTile extends StatelessWidget {
   final Agent agent;
@@ -332,6 +421,12 @@ class _AgentTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final subtle = theme.colorScheme.onSurfaceVariant;
+    final subtitle = agent.type == 'email'
+        ? agent.imapUsername.isNotEmpty
+            ? agent.imapUsername
+            : agent.imapHost
+        : agent.url;
+
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
@@ -357,15 +452,21 @@ class _AgentTile extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         _TypeBadge(agent.type),
+                        if (agent.aiContext.isNotEmpty) ...[
+                          const SizedBox(width: 4),
+                          const _AiBadge(),
+                        ],
                       ],
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      agent.url,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: subtle),
-                    ),
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: subtle),
+                      ),
+                    ],
                     if (agent.lastRun != null) ...[
                       const SizedBox(height: 2),
                       Text(
@@ -393,13 +494,30 @@ class _AgentTile extends StatelessWidget {
     );
   }
 
-  String _fmtDate(String iso) {
-    try {
-      final d = DateTime.parse(iso).toLocal();
-      return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
-    } catch (_) {
-      return iso;
-    }
+}
+
+class _Badge extends StatelessWidget {
+  final String label;
+  final Color bg;
+  final Color border;
+  final Color fg;
+
+  const _Badge({required this.label, required this.bg, required this.border, required this.fg});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: border),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: fg),
+      ),
+    );
   }
 }
 
@@ -409,19 +527,25 @@ class _TypeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: kNotionGreenBg,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: kNotionGreenBorder),
-      ),
-      child: Text(
-        type.toUpperCase(),
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: kNotionGreen),
-      ),
-    );
+    final (bg, border, fg) = switch (type) {
+      'rss'   => (kNotionGreenBg, kNotionGreenBorder, kNotionGreen),
+      'email' => (const Color(0x262383E2), const Color(0x662383E2), kNotionAccent),
+      _       => (const Color(0x26D9730D), const Color(0x66D9730D), kNotionOrange),
+    };
+    return _Badge(label: type.toUpperCase(), bg: bg, border: border, fg: fg);
   }
+}
+
+class _AiBadge extends StatelessWidget {
+  const _AiBadge();
+
+  @override
+  Widget build(BuildContext context) => const _Badge(
+        label: 'AI',
+        bg: Color(0x260F7B6C),
+        border: Color(0x660F7B6C),
+        fg: kNotionGreen,
+      );
 }
 
 class _RunTile extends StatelessWidget {
@@ -432,9 +556,9 @@ class _RunTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final statusColor = switch (run.status) {
-      'ok' => kNotionGreen,
+      'ok'    => kNotionGreen,
       'error' => theme.colorScheme.error,
-      _ => theme.colorScheme.onSurfaceVariant,
+      _       => theme.colorScheme.onSurfaceVariant,
     };
     return Card(
       child: Padding(
@@ -455,9 +579,14 @@ class _RunTile extends StatelessWidget {
                   style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
                 ),
                 const Spacer(),
-                Text(
-                  run.summary,
-                  style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface),
+                Flexible(
+                  child: Text(
+                    run.summary,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface),
+                  ),
                 ),
               ],
             ),
@@ -484,13 +613,4 @@ class _RunTile extends StatelessWidget {
     );
   }
 
-  String _fmtDate(String iso) {
-    try {
-      final d = DateTime.parse(iso).toLocal();
-      return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')} '
-          '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
-    } catch (_) {
-      return iso;
-    }
-  }
 }

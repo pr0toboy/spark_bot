@@ -170,9 +170,16 @@ class HabitCheckResult(BaseModel):
 class AgentCreate(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     type: str
-    url: str = Field(min_length=1, max_length=2048)
+    url: str = Field(default="", max_length=2048)
     keywords: list[str] = []
     interval_minutes: int = 60
+    ai_context: str = Field(default="", max_length=500)
+    # Email-specific
+    imap_host: str = Field(default="imap.gmail.com", max_length=256)
+    imap_port: int = 993
+    imap_username: str = Field(default="", max_length=256)
+    imap_password: str = Field(default="", max_length=256)
+    imap_folder: str = Field(default="INBOX", max_length=64)
 
 
 class AgentUpdate(BaseModel):
@@ -180,6 +187,13 @@ class AgentUpdate(BaseModel):
     keywords: list[str] | None = None
     enabled: bool | None = None
     interval_minutes: int | None = None
+    ai_context: str | None = None
+    # Email-specific
+    imap_host: str | None = None
+    imap_port: int | None = None
+    imap_username: str | None = None
+    imap_password: str | None = None
+    imap_folder: str | None = None
 
 
 class AgentItem(BaseModel):
@@ -191,6 +205,11 @@ class AgentItem(BaseModel):
     enabled: bool
     interval_minutes: int
     last_run: str | None = None
+    ai_context: str = ""
+    imap_host: str = ""
+    imap_port: int = 993
+    imap_username: str = ""
+    imap_folder: str = "INBOX"
 
 
 class AgentRunItem(BaseModel):
