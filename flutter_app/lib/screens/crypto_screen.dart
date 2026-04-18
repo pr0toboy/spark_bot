@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../theme.dart';
 import '../models/crypto.dart';
 import '../services/api_service.dart';
+import '../widgets/notion_section_label.dart';
 
 String _fmtUsd(double v) {
   if (v == 0) return '\$0.00';
@@ -11,19 +13,16 @@ String _fmtUsd(double v) {
   return '\$${v.toStringAsExponential(2)}';
 }
 
+const _kChainTicker = {
+  'btc': 'BTC', 'xpub': 'BTC', 'eth': 'ETH',
+  'avax': 'AVAX', 'sol': 'SOL', 'dot': 'DOT',
+};
+
 String _fmtBal(double bal, String chain) {
-  final ticker = const {
-    'btc': 'BTC', 'xpub': 'BTC', 'eth': 'ETH',
-    'avax': 'AVAX', 'sol': 'SOL', 'dot': 'DOT',
-  }[chain] ?? chain.toUpperCase();
+  final ticker = _kChainTicker[chain] ?? chain.toUpperCase();
   final decimals = (chain == 'btc' || chain == 'xpub') ? 6 : 4;
   return '${bal.toStringAsFixed(decimals)} $ticker';
 }
-
-const _kOrange = Color(0xFFF5A97C);
-const _kBlue   = Color(0xFF7C9CF5);
-const _kGreen  = Color(0xFF7CF5A9);
-const _kPink   = Color(0xFFF57CAA);
 
 class CryptoScreen extends StatefulWidget {
   const CryptoScreen({super.key});
@@ -229,8 +228,8 @@ class _CryptoScreenState extends State<CryptoScreen>
               const SizedBox(height: 12),
               SegmentedButton<String>(
                 segments: const [
-                  ButtonSegment(value: 'above', label: Text('Au-dessus'), icon: Icon(Icons.arrow_upward, size: 16)),
-                  ButtonSegment(value: 'below', label: Text('En-dessous'), icon: Icon(Icons.arrow_downward, size: 16)),
+                  ButtonSegment(value: 'above', label: Text('Au-dessus'), icon: Icon(Icons.arrow_upward, size: 14)),
+                  ButtonSegment(value: 'below', label: Text('En-dessous'), icon: Icon(Icons.arrow_downward, size: 14)),
                 ],
                 selected: {direction},
                 onSelectionChanged: (s) => setS(() => direction = s.first),
@@ -280,6 +279,7 @@ class _CryptoScreenState extends State<CryptoScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Crypto'),
@@ -296,9 +296,9 @@ class _CryptoScreenState extends State<CryptoScreen>
         bottom: TabBar(
           controller: _tab,
           tabs: const [
-            Tab(icon: Icon(Icons.show_chart),        text: 'Marché'),
-            Tab(icon: Icon(Icons.account_balance_wallet_outlined), text: 'Portfolio'),
-            Tab(icon: Icon(Icons.notifications_outlined), text: 'Alertes'),
+            Tab(text: 'Marché'),
+            Tab(text: 'Portfolio'),
+            Tab(text: 'Alertes'),
           ],
         ),
       ),
@@ -340,7 +340,7 @@ class _CryptoScreenState extends State<CryptoScreen>
       child: ListView(
         padding: const EdgeInsets.fromLTRB(12, 16, 12, 80),
         children: [
-          _sectionLabel('COURS', Icons.show_chart),
+          const NotionSectionLabel('Cours', Icons.show_chart),
           const SizedBox(height: 8),
           GridView.builder(
             shrinkWrap: true,
@@ -356,7 +356,7 @@ class _CryptoScreenState extends State<CryptoScreen>
           ),
           if (_trending.isNotEmpty) ...[
             const SizedBox(height: 20),
-            _sectionLabel('TENDANCES', Icons.local_fire_department_outlined),
+            const NotionSectionLabel('Tendances', Icons.local_fire_department_outlined),
             const SizedBox(height: 8),
             ..._trending.map((t) => _TrendTile(t)),
           ],
@@ -371,7 +371,7 @@ class _CryptoScreenState extends State<CryptoScreen>
       return Center(
         child: FilledButton.icon(
           onPressed: _loadPortfolio,
-          icon: const Icon(Icons.download_outlined),
+          icon: const Icon(Icons.download_outlined, size: 16),
           label: const Text('Charger le portfolio'),
         ),
       );
@@ -382,24 +382,28 @@ class _CryptoScreenState extends State<CryptoScreen>
       child: ListView(
         padding: const EdgeInsets.fromLTRB(12, 16, 12, 80),
         children: [
-          if (p.totalUsd != null)
-            _TotalCard(p.totalUsd!),
+          if (p.totalUsd != null) _TotalCard(p.totalUsd!),
           const SizedBox(height: 12),
           if (p.wallets.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 32),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Center(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.account_balance_wallet_outlined, size: 48, color: Colors.white24),
+                    Icon(Icons.account_balance_wallet_outlined,
+                        size: 40, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     const SizedBox(height: 12),
-                    const Text('Aucun wallet — appuie sur + pour en ajouter un.'),
+                    Text(
+                      'Aucun wallet — appuie sur + pour en ajouter un.',
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    ),
                   ],
                 ),
               ),
             )
           else ...[
-            _sectionLabel('WALLETS', Icons.account_balance_wallet_outlined),
+            const NotionSectionLabel('Wallets', Icons.account_balance_wallet_outlined),
             const SizedBox(height: 8),
             ...p.wallets.map((w) => _WalletTile(w,
                 onRename: () => _renameWallet(w),
@@ -416,10 +420,14 @@ class _CryptoScreenState extends State<CryptoScreen>
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: const [
-            Icon(Icons.notifications_off_outlined, size: 48, color: Colors.white24),
-            SizedBox(height: 12),
-            Text('Aucune alerte — appuie sur + pour en créer une.'),
+          children: [
+            Icon(Icons.notifications_off_outlined,
+                size: 40, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            const SizedBox(height: 12),
+            Text(
+              'Aucune alerte — appuie sur + pour en créer une.',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
           ],
         ),
       );
@@ -433,23 +441,6 @@ class _CryptoScreenState extends State<CryptoScreen>
     );
   }
 
-  Widget _sectionLabel(String label, IconData icon) {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: theme.colorScheme.primary),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.primary,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 class _MarketCard extends StatelessWidget {
@@ -459,12 +450,9 @@ class _MarketCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final up    = item.change24h >= 0;
-    final color = up ? _kGreen : _kPink;
+    final color = up ? kNotionGreen : kNotionRed;
     final theme = Theme.of(context);
     return Card(
-      elevation: 0,
-      color: theme.colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Column(
@@ -472,15 +460,18 @@ class _MarketCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(item.symbol,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: theme.colorScheme.onSurface,
+                )),
             const SizedBox(height: 2),
             Text(_fmtUsd(item.priceUsd),
-                style: const TextStyle(fontSize: 12)),
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface)),
             const SizedBox(height: 2),
             Row(
               children: [
-                Icon(up ? Icons.arrow_upward : Icons.arrow_downward,
-                    size: 11, color: color),
+                Icon(up ? Icons.arrow_upward : Icons.arrow_downward, size: 11, color: color),
                 Text(
                   '${item.change24h.abs().toStringAsFixed(2)}%',
                   style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600),
@@ -502,27 +493,22 @@ class _TrendTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Card(
-        elevation: 0,
-        color: theme.colorScheme.surfaceContainerLow,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           child: Row(
             children: [
-              Container(
-                width: 32, height: 32,
-                decoration: BoxDecoration(
-                  color: _kOrange.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.local_fire_department, size: 16, color: _kOrange),
-              ),
+              Icon(Icons.local_fire_department_outlined,
+                  size: 16, color: kNotionOrange),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(trend.name,
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurface,
+                    )),
               ),
               Text(trend.symbol,
                   style: TextStyle(
@@ -531,11 +517,19 @@ class _TrendTile extends StatelessWidget {
                   )),
               if (trend.rank != null) ...[
                 const SizedBox(width: 8),
-                Text('#${trend.rank}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
-                    )),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: theme.colorScheme.outline),
+                  ),
+                  child: Text('#${trend.rank}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      )),
+                ),
               ],
             ],
           ),
@@ -551,23 +545,28 @@ class _TotalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Card(
-      elevation: 0,
-      color: _kBlue.withOpacity(0.12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: _kBlue.withOpacity(0.3)),
-      ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Total portfolio',
-                style: TextStyle(fontSize: 12, color: _kBlue.withOpacity(0.8))),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurfaceVariant,
+                )),
             const SizedBox(height: 4),
-            Text(_fmtUsd(totalUsd),
-                style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+            Text(
+              _fmtUsd(totalUsd),
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
           ],
         ),
       ),
@@ -588,21 +587,19 @@ class _WalletTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Card(
-        elevation: 0,
-        color: theme.colorScheme.surfaceContainerLow,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
           child: Row(
             children: [
               Container(
-                width: 38, height: 38,
+                width: 34, height: 34,
                 decoration: BoxDecoration(
-                  color: _kOrange.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
+                  color: theme.colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(color: theme.colorScheme.outline),
                 ),
-                child: const Icon(Icons.account_balance_wallet_outlined,
-                    size: 18, color: _kOrange),
+                child: Icon(Icons.account_balance_wallet_outlined,
+                    size: 16, color: theme.colorScheme.onSurfaceVariant),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -610,7 +607,11 @@ class _WalletTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(wallet.label,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: theme.colorScheme.onSurface,
+                        )),
                     Text(short,
                         style: TextStyle(
                           fontSize: 11,
@@ -624,19 +625,21 @@ class _WalletTile extends StatelessWidget {
                             (wallet.balanceUsd != null
                                 ? '  ≈ ${_fmtUsd(wallet.balanceUsd!)}'
                                 : ''),
-                        style: const TextStyle(fontSize: 12),
+                        style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface),
                       ),
                     ],
                   ],
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.edit_outlined, size: 20),
+                icon: Icon(Icons.edit_outlined, size: 18,
+                    color: theme.colorScheme.onSurfaceVariant),
                 visualDensity: VisualDensity.compact,
                 onPressed: onRename,
               ),
               IconButton(
-                icon: const Icon(Icons.delete_outline, size: 20),
+                icon: Icon(Icons.delete_outline, size: 18,
+                    color: theme.colorScheme.onSurfaceVariant),
                 visualDensity: VisualDensity.compact,
                 onPressed: onDelete,
               ),
@@ -657,27 +660,32 @@ class _AlertTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme   = Theme.of(context);
     final up      = alert.direction == 'above';
-    final color   = up ? _kGreen : _kPink;
-    final icon    = up ? Icons.arrow_upward : Icons.arrow_downward;
+    final color   = up ? kNotionGreen : kNotionRed;
     final label   = up ? '>' : '<';
+    // Pre-computed opacity colors for the icon container
+    final iconBg     = alert.active ? color.withOpacity(0.10) : color.withOpacity(0.05);
+    final iconBorder = alert.active ? color.withOpacity(0.30) : color.withOpacity(0.15);
+    final iconColor  = alert.active ? color : color.withOpacity(0.4);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Card(
-        elevation: 0,
-        color: theme.colorScheme.surfaceContainerLow,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
           child: Row(
             children: [
               Container(
-                width: 38, height: 38,
+                width: 34, height: 34,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(alert.active ? 0.15 : 0.07),
-                  borderRadius: BorderRadius.circular(10),
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(color: iconBorder),
                 ),
-                child: Icon(icon, size: 18,
-                    color: color.withOpacity(alert.active ? 1.0 : 0.4)),
+                child: Icon(
+                  up ? Icons.arrow_upward : Icons.arrow_downward,
+                  size: 16,
+                  color: iconColor,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -689,23 +697,24 @@ class _AlertTile extends StatelessWidget {
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
-                        color: alert.active ? null : theme.disabledColor,
+                        color: alert.active
+                            ? theme.colorScheme.onSurface
+                            : theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     Text(
                       alert.active ? 'Active' : 'Déclenchée',
                       style: TextStyle(
                         fontSize: 11,
-                        color: alert.active
-                            ? color.withOpacity(0.8)
-                            : theme.disabledColor,
+                        color: alert.active ? color : theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.delete_outline, size: 20),
+                icon: Icon(Icons.delete_outline, size: 18,
+                    color: theme.colorScheme.onSurfaceVariant),
                 visualDensity: VisualDensity.compact,
                 onPressed: onDelete,
               ),

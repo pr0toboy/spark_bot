@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme.dart';
 import '../models/skill.dart';
 import '../services/api_service.dart';
 
@@ -93,7 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (_) => AlertDialog(
-          title: Text(preset != null ? 'Ajouter le preset ${preset.name}' : 'Nouveau skill'),
+          title: Text(preset != null ? 'Ajouter ${preset.name}' : 'Nouveau skill'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -154,30 +155,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-
+    final theme = Theme.of(context);
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     return Scaffold(
-      appBar: AppBar(title: const Text('Paramètres')),
+      appBar: AppBar(
+        title: const Text('Paramètres'),
+        bottom: notionAppBarDivider(context),
+      ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
           _section('Connexion', [
-            ListTile(
-              title: const Text('URL du serveur'),
-              subtitle: Text(_api.baseUrl),
-              trailing: TextButton(onPressed: _setServerUrl, child: const Text('Modifier')),
+            _row(
+              title: 'Serveur',
+              subtitle: _api.baseUrl,
+              trailing: _actionBtn('Modifier', _setServerUrl),
             ),
           ]),
           _section('Clés API', [
-            _keyTile('Anthropic', _settings['has_anthropic_key'] == true),
-            _keyTile('Groq', _settings['has_groq_key'] == true),
-            _keyTile('GLM', _settings['has_glm_key'] == true),
+            _keyRow('Anthropic', _settings['has_anthropic_key'] == true),
+            _keyRow('Groq', _settings['has_groq_key'] == true),
+            _keyRow('GLM', _settings['has_glm_key'] == true),
           ]),
           _section('Outils', [
             for (final tool in _tools)
-              SwitchListTile(
-                title: Text(tool['name'] as String),
-                subtitle: Text(tool['description'] as String),
+              _switchRow(
+                title: tool['name'] as String,
+                subtitle: tool['description'] as String,
                 value: tool['enabled'] as bool,
                 onChanged: (val) async {
                   try {
@@ -191,64 +197,218 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ]),
           _section('Skills actifs', [
             if (_skills.isEmpty)
-              const ListTile(title: Text('Aucun skill actif.')),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Text('Aucun skill actif.',
+                    style: TextStyle(fontSize: 14,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              ),
             for (final skill in _skills)
-              ListTile(
-                title: Text(skill.name),
-                subtitle: Text(skill.instructions, maxLines: 1, overflow: TextOverflow.ellipsis),
+              _row(
+                title: skill.name,
+                subtitle: skill.instructions,
+                maxSubtitleLines: 1,
                 trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline),
+                  icon: Icon(Icons.delete_outline, size: 18,
+                      color: theme.colorScheme.onSurfaceVariant),
+                  visualDensity: VisualDensity.compact,
                   onPressed: () async {
                     await _api.deleteSkill(skill.name);
                     await _load();
                   },
                 ),
               ),
-            ListTile(
-              leading: const Icon(Icons.add),
-              title: const Text('Ajouter un skill'),
+            _row(
+              title: 'Ajouter un skill',
+              leading: Icon(Icons.add, size: 18, color: theme.colorScheme.onSurfaceVariant),
               onTap: () => _addSkill(),
             ),
           ]),
           _section('Presets disponibles', [
             for (final preset in _presets)
-              ListTile(
-                title: Text(preset.name),
-                subtitle: Text(preset.instructions.split('\n').first, maxLines: 1, overflow: TextOverflow.ellipsis),
+              _row(
+                title: preset.name,
+                subtitle: preset.instructions.split('\n').first,
+                maxSubtitleLines: 1,
                 trailing: _skills.any((s) => s.name == preset.name)
-                    ? const Chip(label: Text('actif'))
-                    : FilledButton.tonal(
-                        onPressed: () => _addSkill(preset: preset),
-                        child: const Text('Ajouter'),
-                      ),
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: kNotionGreen.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(color: kNotionGreen.withOpacity(0.3)),
+                        ),
+                        child: Text('actif',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: kNotionGreen,
+                              fontWeight: FontWeight.w500,
+                            )),
+                      )
+                    : _actionBtn('Ajouter', () => _addSkill(preset: preset)),
               ),
           ]),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  Widget _section(String title, List<Widget> children) {
+  Widget _section(String title, List<Widget> rows) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+          child: Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
         ),
-        Card(child: Column(children: children)),
-        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Card(
+            child: Column(
+              children: [
+                for (int i = 0; i < rows.length; i++) ...[
+                  rows[i],
+                  if (i < rows.length - 1)
+                    Divider(height: 1, indent: 16, color: theme.colorScheme.outline),
+                ],
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _keyTile(String provider, bool hasKey) {
-    return ListTile(
-      title: Text('$provider ${hasKey ? '✅' : '⭕'}'),
-      subtitle: Text(hasKey ? 'Clé enregistrée' : 'Aucune clé'),
-      trailing: TextButton(
-        onPressed: () => _setApiKey(provider.toLowerCase()),
-        child: Text(hasKey ? 'Modifier' : 'Ajouter'),
+  Widget _row({
+    required String title,
+    String? subtitle,
+    int maxSubtitleLines = 2,
+    Widget? trailing,
+    Widget? leading,
+    VoidCallback? onTap,
+  }) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            if (leading != null) ...[leading, const SizedBox(width: 10)],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: theme.colorScheme.onSurface,
+                      )),
+                  if (subtitle != null && subtitle.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: maxSubtitleLines,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (trailing != null) ...[const SizedBox(width: 8), trailing],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _switchRow({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface)),
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    )),
+              ],
+            ),
+          ),
+          Switch(value: value, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
+
+  Widget _keyRow(String provider, bool hasKey) {
+    return _row(
+      title: provider,
+      subtitle: hasKey ? 'Clé enregistrée' : 'Aucune clé',
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8, height: 8,
+            decoration: BoxDecoration(
+              color: hasKey ? kNotionGreen : Theme.of(context).colorScheme.outline,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          _actionBtn(hasKey ? 'Modifier' : 'Ajouter',
+              () => _setApiKey(provider.toLowerCase())),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionBtn(String label, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(5),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(color: theme.colorScheme.outline),
+        ),
+        child: Text(label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurface,
+            )),
       ),
     );
   }

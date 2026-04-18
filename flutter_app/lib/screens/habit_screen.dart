@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
+import '../theme.dart';
 import '../models/habit.dart';
 import '../services/api_service.dart';
-
-const _kPurple = Color(0xFF9C7CF5);
-const _kGreen  = Color(0xFF7CF5A9);
-const _kOrange = Color(0xFFF5A97C);
-const _kPink   = Color(0xFFF57CAA);
 
 const _kDays = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'];
 
@@ -114,7 +110,12 @@ class _HabitScreenState extends State<HabitScreen>
                 textInputAction: TextInputAction.done,
               ),
               const SizedBox(height: 16),
-              const Text('Fréquence', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              Text('Fréquence',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  )),
               const SizedBox(height: 8),
               SegmentedButton<String>(
                 segments: const [
@@ -168,8 +169,10 @@ class _HabitScreenState extends State<HabitScreen>
     if (confirmed != true) return;
     try {
       await _api.deleteHabit(h.id);
-      setState(() => _habits.removeWhere((x) => x.id == h.id));
-      if (_selectedId == h.id) setState(() { _selectedId = null; _selectedStats = null; });
+      setState(() {
+        _habits.removeWhere((x) => x.id == h.id);
+        if (_selectedId == h.id) { _selectedId = null; _selectedStats = null; }
+      });
     } on ApiException catch (e) {
       _showErr(e.message);
     }
@@ -182,6 +185,7 @@ class _HabitScreenState extends State<HabitScreen>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Habitudes'),
@@ -197,8 +201,8 @@ class _HabitScreenState extends State<HabitScreen>
         bottom: TabBar(
           controller: _tab,
           tabs: const [
-            Tab(icon: Icon(Icons.check_circle_outline), text: 'Aujourd\'hui'),
-            Tab(icon: Icon(Icons.bar_chart_outlined),   text: 'Stats'),
+            Tab(text: 'Aujourd\'hui'),
+            Tab(text: 'Stats'),
           ],
         ),
       ),
@@ -220,14 +224,19 @@ class _HabitScreenState extends State<HabitScreen>
 
   Widget _buildToday() {
     if (_loading) return const Center(child: CircularProgressIndicator());
+    final theme = Theme.of(context);
     if (_habits.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: const [
-            Icon(Icons.self_improvement, size: 52, color: Colors.white24),
-            SizedBox(height: 12),
-            Text('Aucune habitude — appuie sur + pour commencer.'),
+          children: [
+            Icon(Icons.self_improvement, size: 48,
+                color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(height: 12),
+            Text(
+              'Aucune habitude — appuie sur + pour commencer.',
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
           ],
         ),
       );
@@ -240,7 +249,7 @@ class _HabitScreenState extends State<HabitScreen>
         padding: const EdgeInsets.fromLTRB(12, 16, 12, 80),
         children: [
           _ProgressHeader(done: done, total: total),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           ..._habits.map((h) => _HabitTile(
                 habit: h,
                 onToggle: () => _toggleHabit(h),
@@ -256,8 +265,12 @@ class _HabitScreenState extends State<HabitScreen>
   }
 
   Widget _buildStats() {
+    final theme = Theme.of(context);
     if (_habits.isEmpty && !_loading) {
-      return const Center(child: Text('Aucune habitude à afficher.'));
+      return Center(
+        child: Text('Aucune habitude à afficher.',
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+      );
     }
     return Column(
       children: [
@@ -286,32 +299,41 @@ class _HabitScreenState extends State<HabitScreen>
   }
 
   Widget _statsBody() {
+    final theme = Theme.of(context);
     if (_loadingStats) return const Center(child: CircularProgressIndicator());
     if (_selectedStats == null) {
-      return const Center(child: Text('Sélectionne une habitude ci-dessus.'));
+      return Center(
+        child: Text('Sélectionne une habitude ci-dessus.',
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+      );
     }
     final s = _selectedStats!;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         Text(s.name,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.3,
+              color: theme.colorScheme.onSurface,
+            )),
         const SizedBox(height: 16),
         Row(
           children: [
-            _StatCard(label: 'Streak', value: '${s.streak}', icon: Icons.local_fire_department, color: _kOrange),
+            _StatCard(label: 'Streak', value: '${s.streak}', icon: Icons.local_fire_department, color: kNotionOrange),
             const SizedBox(width: 8),
-            _StatCard(label: 'Record', value: '${s.bestStreak}', icon: Icons.emoji_events_outlined, color: _kPurple),
+            _StatCard(label: 'Record', value: '${s.bestStreak}', icon: Icons.emoji_events_outlined, color: kNotionAccent),
             const SizedBox(width: 8),
-            _StatCard(label: 'Total', value: '${s.total}', icon: Icons.done_all, color: _kGreen),
+            _StatCard(label: 'Total', value: '${s.total}', icon: Icons.done_all, color: kNotionGreen),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
         Row(
           children: [
-            _StatCard(label: 'Cette semaine', value: '${s.weekDone}/7', icon: Icons.calendar_view_week_outlined, color: _kGreen),
+            _StatCard(label: 'Cette semaine', value: '${s.weekDone}/7', icon: Icons.calendar_view_week_outlined, color: kNotionGreen),
             const SizedBox(width: 8),
-            _StatCard(label: 'Ce mois', value: '${s.monthDone}/30', icon: Icons.calendar_month_outlined, color: _kPurple),
+            _StatCard(label: 'Ce mois', value: '${s.monthDone}/30', icon: Icons.calendar_month_outlined, color: kNotionAccent),
           ],
         ),
         const SizedBox(height: 20),
@@ -328,42 +350,45 @@ class _ProgressHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pct = total == 0 ? 0.0 : done / total;
+    final pct   = total == 0 ? 0.0 : done / total;
     final theme = Theme.of(context);
+    final completeColor = kNotionGreen;
+    final activeColor   = theme.colorScheme.primary;
+
     return Card(
-      elevation: 0,
-      color: _kPurple.withOpacity(0.1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: _kPurple.withOpacity(0.25)),
-      ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Aujourd\'hui',
-                    style: TextStyle(fontSize: 12, color: _kPurple.withOpacity(0.8))),
-                Text('$done / $total',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-              ],
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Aujourd\'hui',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.onSurface,
+                  )),
+              Text('$done / $total',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: pct == 1.0 ? completeColor : theme.colorScheme.onSurfaceVariant,
+                  )),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: pct,
+              minHeight: 5,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              valueColor: AlwaysStoppedAnimation(pct == 1.0 ? completeColor : activeColor),
             ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: pct,
-                minHeight: 6,
-                backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                valueColor: AlwaysStoppedAnimation(
-                  pct == 1.0 ? _kGreen : _kPurple,
-                ),
-              ),
-            ),
-          ],
+          ),
+        ],
         ),
       ),
     );
@@ -386,88 +411,82 @@ class _HabitTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final done  = habit.doneToday;
-    final color = done ? _kGreen : _kPurple;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Card(
-        elevation: 0,
-        color: theme.colorScheme.surfaceContainerLow,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(4, 10, 8, 10),
+          padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
           child: Row(
-            children: [
-              IconButton(
-                onPressed: onToggle,
-                icon: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: Icon(
-                    done ? Icons.check_circle : Icons.radio_button_unchecked,
-                    key: ValueKey(done),
-                    color: color,
-                    size: 28,
-                  ),
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            IconButton(
+              onPressed: onToggle,
+              icon: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: Icon(
+                  done ? Icons.check_circle : Icons.radio_button_unchecked,
+                  key: ValueKey(done),
+                  color: done
+                      ? kNotionGreen
+                      : theme.colorScheme.onSurfaceVariant,
+                  size: 24,
                 ),
               ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(habit.name,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: done ? theme.disabledColor : null,
-                          decoration: done ? TextDecoration.lineThrough : null,
-                        )),
-                    const SizedBox(height: 4),
-                    _WeekRow(week: habit.week, compact: true),
-                    if (habit.streak >= 2)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 3),
-                        child: Row(
-                          children: [
-                            Icon(Icons.local_fire_department, size: 13, color: _kOrange),
-                            const SizedBox(width: 2),
-                            Text('${habit.streak}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: _kOrange,
-                                  fontWeight: FontWeight.w600,
-                                )),
-                            const SizedBox(width: 8),
-                            Text(habit.freqLabel,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                )),
-                          ],
-                        ),
-                      )
-                    else
-                      Padding(
-                        padding: const EdgeInsets.only(top: 3),
-                        child: Text(habit.freqLabel,
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(habit.name,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                        color: done
+                            ? theme.colorScheme.onSurfaceVariant
+                            : theme.colorScheme.onSurface,
+                        decoration: done ? TextDecoration.lineThrough : null,
+                        decorationColor: theme.colorScheme.onSurfaceVariant,
+                      )),
+                  const SizedBox(height: 5),
+                  _WeekRow(week: habit.week, compact: true),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      if (habit.streak >= 2) ...[
+                        Icon(Icons.local_fire_department, size: 12, color: kNotionOrange),
+                        const SizedBox(width: 2),
+                        Text('${habit.streak}',
                             style: TextStyle(
                               fontSize: 11,
-                              color: theme.colorScheme.onSurfaceVariant,
+                              color: kNotionOrange,
+                              fontWeight: FontWeight.w600,
                             )),
-                      ),
-                  ],
-                ),
+                        const SizedBox(width: 8),
+                      ],
+                      Text(habit.freqLabel,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          )),
+                    ],
+                  ),
+                ],
               ),
-              IconButton(
-                icon: const Icon(Icons.bar_chart_outlined, size: 20),
-                visualDensity: VisualDensity.compact,
-                onPressed: onStats,
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline, size: 20),
-                visualDensity: VisualDensity.compact,
-                onPressed: onDelete,
-              ),
-            ],
+            ),
+            IconButton(
+              icon: Icon(Icons.bar_chart_outlined, size: 18,
+                  color: theme.colorScheme.onSurfaceVariant),
+              visualDensity: VisualDensity.compact,
+              onPressed: onStats,
+            ),
+            IconButton(
+              icon: Icon(Icons.delete_outline, size: 18,
+                  color: theme.colorScheme.onSurfaceVariant),
+              visualDensity: VisualDensity.compact,
+              onPressed: onDelete,
+            ),
+          ],
           ),
         ),
       ),
@@ -482,8 +501,14 @@ class _WeekRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = compact ? 20.0 : 28.0;
+    final theme    = Theme.of(context);
+    final size     = compact ? 18.0 : 26.0;
     final fontSize = compact ? 8.0 : 10.0;
+    const doneColor   = kNotionGreen;
+    final emptyColor  = theme.colorScheme.surfaceContainerLow;
+    const doneBorder  = kNotionGreenBorder;
+    final emptyBorder = theme.colorScheme.outline;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(7, (i) {
@@ -496,23 +521,23 @@ class _WeekRow extends StatelessWidget {
                 width: size,
                 height: size,
                 decoration: BoxDecoration(
-                  color: done ? _kGreen.withOpacity(0.25) : Colors.white10,
-                  borderRadius: BorderRadius.circular(6),
+                  color: done ? kNotionGreenBg : emptyColor,
+                  borderRadius: BorderRadius.circular(5),
                   border: Border.all(
-                    color: done ? _kGreen.withOpacity(0.6) : Colors.white12,
+                    color: done ? doneBorder : emptyBorder,
                     width: 1,
                   ),
                 ),
                 child: done
-                    ? Icon(Icons.check, size: size * 0.55, color: _kGreen)
+                    ? Icon(Icons.check, size: size * 0.55, color: doneColor)
                     : null,
               ),
               if (!compact) ...[
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Text(_kDays[i],
                     style: TextStyle(
                       fontSize: fontSize,
-                      color: Colors.white38,
+                      color: theme.colorScheme.onSurfaceVariant,
                     )),
               ],
             ],
@@ -540,24 +565,19 @@ class _StatCard extends StatelessWidget {
     final theme = Theme.of(context);
     return Expanded(
       child: Card(
-        elevation: 0,
-        color: color.withOpacity(0.1),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: color.withOpacity(0.25)),
-        ),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, size: 18, color: color),
+              Icon(icon, size: 16, color: color),
               const SizedBox(height: 6),
               Text(value,
                   style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: color,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
+                    color: theme.colorScheme.onSurface,
                   )),
               Text(label,
                   style: TextStyle(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../theme.dart';
+import '../widgets/notion_section_label.dart';
 
 // ─── Modèles internes ────────────────────────────────────────────────────────
 
@@ -10,7 +12,6 @@ class _Cmd {
   final String label;
   final String description;
   final IconData icon;
-  final Color color;
   final _Input input;
   final String? hint1;
   final String? hint2;
@@ -19,8 +20,7 @@ class _Cmd {
     this.command,
     this.label,
     this.description,
-    this.icon,
-    this.color, {
+    this.icon, {
     this.input = _Input.none,
     this.hint1,
     this.hint2,
@@ -36,54 +36,46 @@ class _Section {
 
 // ─── Catalogue de commandes ──────────────────────────────────────────────────
 
-const _kBlue   = Color(0xFF7C9CF5);
-const _kPurple = Color(0xFFB07CF5);
-const _kGreen  = Color(0xFF7CF5A9);
-const _kOrange = Color(0xFFF5A97C);
-const _kPink   = Color(0xFFF57CAA);
-const _kCyan   = Color(0xFF7CDDF5);
-const _kYellow = Color(0xFFF5E17C);
-
 const _sections = [
   _Section('IA', Icons.psychology_outlined, [
-    _Cmd('/recall',      'Recall',           'Afficher la mémoire',         Icons.memory,        _kPurple),
-    _Cmd('/remember',    'Remember',          'Mémoriser une information',    Icons.bookmark_add,  _kPurple,
+    _Cmd('/recall',      'Recall',           'Afficher la mémoire',          Icons.memory),
+    _Cmd('/remember',    'Remember',          'Mémoriser une information',    Icons.bookmark_add,
          input: _Input.text, hint1: 'Info à mémoriser…'),
-    _Cmd('/ai compact',  'Compacter',         'Résumer l\'historique',        Icons.compress,      _kBlue),
-    _Cmd('/ai clear',    'Vider historique',  'Effacer la conversation',      Icons.delete_sweep,  _kBlue),
-    _Cmd('/ai history',  'Historique',        'Voir la conversation en cours',Icons.history,       _kBlue),
+    _Cmd('/ai compact',  'Compacter',         'Résumer l\'historique',        Icons.compress),
+    _Cmd('/ai clear',    'Vider historique',  'Effacer la conversation',      Icons.delete_sweep),
+    _Cmd('/ai history',  'Historique',        'Voir la conversation en cours',Icons.history),
   ]),
   _Section('Organisation', Icons.task_alt, [
-    _Cmd('/note',        'Nouvelle note',     'Créer une note rapide',        Icons.note_add,      _kGreen,
+    _Cmd('/note',        'Nouvelle note',     'Créer une note rapide',        Icons.note_add,
          input: _Input.text, hint1: 'Contenu de la note…'),
-    _Cmd('/note list',   'Lister les notes',  'Voir les 50 dernières notes',  Icons.list_alt,      _kGreen),
-    _Cmd('/note export', 'Exporter vault',    'Exporter vers Obsidian',       Icons.upload_file,   _kGreen),
-    _Cmd('/remind',      'Rappel',            'Créer un rappel minuté',       Icons.alarm_add,     _kOrange,
+    _Cmd('/note list',   'Lister les notes',  'Voir les 50 dernières notes',  Icons.list_alt),
+    _Cmd('/note export', 'Exporter vault',    'Exporter vers Obsidian',       Icons.upload_file),
+    _Cmd('/remind',      'Rappel',            'Créer un rappel minuté',       Icons.alarm_add,
          input: _Input.two, hint1: 'Message du rappel…', hint2: 'Durée (10min, 2h, 30s…)'),
-    _Cmd('/todo',        'Todo — listes',     'Voir toutes les listes',       Icons.checklist,     _kYellow),
-    _Cmd('/todo new',    'Nouvelle liste',    'Créer une liste de tâches',    Icons.playlist_add,  _kYellow,
+    _Cmd('/todo',        'Todo — listes',     'Voir toutes les listes',       Icons.checklist),
+    _Cmd('/todo new',    'Nouvelle liste',    'Créer une liste de tâches',    Icons.playlist_add,
          input: _Input.text, hint1: 'Nom de la liste…'),
-    _Cmd('/todo show',   'Voir une liste',    'Afficher une liste todo',      Icons.format_list_bulleted, _kYellow,
+    _Cmd('/todo show',   'Voir une liste',    'Afficher une liste todo',      Icons.format_list_bulleted,
          input: _Input.text, hint1: 'Nom de la liste…'),
-    _Cmd('/todo add',    'Ajouter une tâche', 'Ajouter à une liste',          Icons.add_task,      _kYellow,
+    _Cmd('/todo add',    'Ajouter une tâche', 'Ajouter à une liste',          Icons.add_task,
          input: _Input.two, hint1: 'Nom de la liste…', hint2: 'Tâche à ajouter…'),
   ]),
   _Section('Info', Icons.explore_outlined, [
-    _Cmd('/weather',     'Météo',             'Météo basée sur l\'IP',        Icons.cloud_outlined, _kCyan),
-    _Cmd('/quote',       'Citation',          'Citation inspirante',          Icons.format_quote,   _kCyan),
-    _Cmd('/localize',    'Localisation',      'Ma position géographique',     Icons.location_on_outlined, _kCyan),
-    _Cmd('/crypto',      'Portfolio crypto',  'Résumé wallets + marché',      Icons.currency_bitcoin, _kOrange),
-    _Cmd('/crypto price','Prix crypto',       'Prix + variation 24h',         Icons.show_chart,     _kOrange,
+    _Cmd('/weather',     'Météo',             'Météo basée sur l\'IP',        Icons.cloud_outlined),
+    _Cmd('/quote',       'Citation',          'Citation inspirante',          Icons.format_quote),
+    _Cmd('/localize',    'Localisation',      'Ma position géographique',     Icons.location_on_outlined),
+    _Cmd('/crypto',      'Portfolio crypto',  'Résumé wallets + marché',      Icons.currency_bitcoin),
+    _Cmd('/crypto price','Prix crypto',       'Prix + variation 24h',         Icons.show_chart,
          input: _Input.text, hint1: 'Coin (btc, eth, sol…)'),
-    _Cmd('/crypto news', 'Tendances',         'Tendances CoinGecko',          Icons.trending_up,    _kOrange),
+    _Cmd('/crypto news', 'Tendances',         'Tendances CoinGecko',          Icons.trending_up),
   ]),
   _Section('Système', Icons.settings_applications_outlined, [
-    _Cmd('/model',       'Modèles actifs',    'Voir les modèles configurés',  Icons.smart_toy_outlined, _kPink),
-    _Cmd('/model list',  'Lister modèles',    'Tous les modèles disponibles', Icons.list,           _kPink),
-    _Cmd('/tools',       'Outils',            'Statut des outils actifs',     Icons.construction_outlined, _kPink),
-    _Cmd('/log',         'Journal',           'Dernières actions enregistrées',Icons.history_edu,   _kBlue),
-    _Cmd('/help',        'Aide',              'Liste complète des commandes',  Icons.help_outline,   _kBlue),
-    _Cmd('/skills',      'Skills',            'Skills IA actifs',             Icons.auto_awesome,   _kPurple),
+    _Cmd('/model',       'Modèles actifs',    'Voir les modèles configurés',  Icons.smart_toy_outlined),
+    _Cmd('/model list',  'Lister modèles',    'Tous les modèles disponibles', Icons.list),
+    _Cmd('/tools',       'Outils',            'Statut des outils actifs',     Icons.construction_outlined),
+    _Cmd('/log',         'Journal',           'Dernières actions enregistrées',Icons.history_edu),
+    _Cmd('/help',        'Aide',              'Liste complète des commandes',  Icons.help_outline),
+    _Cmd('/skills',      'Skills',            'Skills IA actifs',             Icons.auto_awesome),
   ]),
 ];
 
@@ -126,7 +118,7 @@ class _CommandsScreenState extends State<CommandsScreen> {
       _showResult(cmd.label, result.reply);
     } on ApiException catch (e) {
       if (!mounted) return;
-      _showResult(cmd.label, '❌ ${e.message}');
+      _showResult(cmd.label, '⚠ ${e.message}');
     } finally {
       if (mounted) setState(() => _running = false);
     }
@@ -201,12 +193,10 @@ class _CommandsScreenState extends State<CommandsScreen> {
   }
 
   void _showResult(String title, String text) {
+    final theme = Theme.of(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (_) => DraggableScrollableSheet(
         expand: false,
         initialChildSize: 0.5,
@@ -214,36 +204,46 @@ class _CommandsScreenState extends State<CommandsScreen> {
         maxChildSize: 0.9,
         builder: (_, scroll) => Column(
           children: [
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Container(
-              width: 40, height: 4,
+              width: 36, height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade400,
+                color: theme.colorScheme.outlineVariant,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
               child: Row(
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  Text(title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: theme.colorScheme.onSurface,
+                      )),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close, size: 18),
                     visualDensity: VisualDensity.compact,
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
             ),
-            const Divider(height: 1),
+            Divider(height: 1, color: theme.colorScheme.outline),
             Expanded(
               child: SingleChildScrollView(
                 controller: scroll,
                 padding: const EdgeInsets.all(16),
                 child: SelectableText(
                   text,
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.5),
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 13,
+                    height: 1.6,
+                    color: theme.colorScheme.onSurface,
+                  ),
                 ),
               ),
             ),
@@ -255,15 +255,20 @@ class _CommandsScreenState extends State<CommandsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Commandes'),
         bottom: _running
-            ? const PreferredSize(
-                preferredSize: Size.fromHeight(3),
-                child: LinearProgressIndicator(),
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(2),
+                child: LinearProgressIndicator(
+                  minHeight: 2,
+                  color: theme.colorScheme.primary,
+                  backgroundColor: Colors.transparent,
+                ),
               )
-            : null,
+            : notionAppBarDivider(context),
       ),
       body: ListView.builder(
         padding: const EdgeInsets.only(bottom: 24),
@@ -271,7 +276,12 @@ class _CommandsScreenState extends State<CommandsScreen> {
         itemBuilder: (context, index) {
           int offset = 0;
           for (final section in _sections) {
-            if (index == offset) return _SectionHeader(section);
+            if (index == offset) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
+                child: NotionSectionLabel(section.title, section.icon),
+              );
+            }
             offset++;
             final cmdIndex = index - offset;
             if (cmdIndex < section.commands.length) {
@@ -291,33 +301,6 @@ class _CommandsScreenState extends State<CommandsScreen> {
 
 // ─── Widgets ─────────────────────────────────────────────────────────────────
 
-class _SectionHeader extends StatelessWidget {
-  final _Section section;
-  const _SectionHeader(this.section, {super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
-      child: Row(
-        children: [
-          Icon(section.icon, size: 16, color: theme.colorScheme.primary),
-          const SizedBox(width: 6),
-          Text(
-            section.title.toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _CommandTile extends StatelessWidget {
   final _Cmd cmd;
   final VoidCallback? onTap;
@@ -325,33 +308,32 @@ class _CommandTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme    = Theme.of(context);
     final disabled = onTap == null;
+    final iconColor = disabled
+        ? theme.colorScheme.onSurfaceVariant.withOpacity(0.4)
+        : theme.colorScheme.onSurfaceVariant;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-      child: Card(
-        elevation: 0,
-        color: theme.colorScheme.surfaceContainerLow,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
             child: Row(
               children: [
                 Container(
-                  width: 40, height: 40,
+                  width: 32, height: 32,
                   decoration: BoxDecoration(
-                    color: cmd.color.withOpacity(disabled ? 0.1 : 0.15),
-                    borderRadius: BorderRadius.circular(10),
+                    color: theme.colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(7),
+                    border: Border.all(color: theme.colorScheme.outline),
                   ),
-                  child: Icon(
-                    cmd.icon,
-                    color: disabled ? cmd.color.withOpacity(0.4) : cmd.color,
-                    size: 20,
-                  ),
+                  child: Icon(cmd.icon, color: iconColor, size: 16),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -361,15 +343,19 @@ class _CommandTile extends StatelessWidget {
                       Text(
                         cmd.label,
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: disabled ? theme.disabledColor : null,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                          color: disabled
+                              ? theme.colorScheme.onSurfaceVariant.withOpacity(0.5)
+                              : theme.colorScheme.onSurface,
                         ),
                       ),
                       Text(
                         cmd.description,
-                        style: theme.textTheme.bodySmall?.copyWith(
+                        style: TextStyle(
+                          fontSize: 12,
                           color: disabled
-                              ? theme.disabledColor
+                              ? theme.colorScheme.onSurfaceVariant.withOpacity(0.4)
                               : theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -377,18 +363,13 @@ class _CommandTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                if (cmd.input != _Input.none)
-                  Icon(
-                    Icons.edit_outlined,
-                    size: 15,
-                    color: theme.colorScheme.onSurfaceVariant.withOpacity(disabled ? 0.3 : 0.6),
-                  )
-                else
-                  Icon(
-                    Icons.play_arrow_rounded,
-                    size: 18,
-                    color: cmd.color.withOpacity(disabled ? 0.3 : 0.8),
-                  ),
+                Icon(
+                  cmd.input != _Input.none
+                      ? Icons.chevron_right
+                      : Icons.play_arrow_rounded,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant.withOpacity(disabled ? 0.3 : 0.5),
+                ),
               ],
             ),
           ),

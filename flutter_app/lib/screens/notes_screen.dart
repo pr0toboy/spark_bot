@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/note.dart';
 import '../services/api_service.dart';
+import '../theme.dart';
 import '../widgets/graph_view.dart';
 
 class NotesScreen extends StatefulWidget {
@@ -57,7 +58,7 @@ class _NotesScreenState extends State<NotesScreen> {
         content: TextField(
           controller: controller,
           autofocus: true,
-          maxLines: 4,
+          maxLines: 5,
           decoration: const InputDecoration(hintText: 'Contenu de la note…'),
         ),
         actions: [
@@ -118,6 +119,7 @@ class _NotesScreenState extends State<NotesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Notes'),
@@ -132,6 +134,7 @@ class _NotesScreenState extends State<NotesScreen> {
             onPressed: _load,
           ),
         ],
+        bottom: notionAppBarDivider(context),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -152,19 +155,72 @@ class _NotesScreenState extends State<NotesScreen> {
   }
 
   Widget _buildList() {
+    final theme = Theme.of(context);
     if (_notes.isEmpty) {
-      return const Center(child: Text('Aucune note. Appuie sur + pour en créer une.'));
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.note_outlined, size: 48,
+                color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(height: 12),
+            Text(
+              'Aucune note. Appuie sur + pour en créer une.',
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
     }
-    return ListView.builder(
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
       itemCount: _notes.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 6),
       itemBuilder: (_, i) {
         final note = _notes[i];
-        return ListTile(
-          title: Text(note.content, maxLines: 2, overflow: TextOverflow.ellipsis),
-          subtitle: Text(note.timestamp, style: const TextStyle(fontSize: 11)),
-          trailing: IconButton(
-            icon: const Icon(Icons.delete_outline),
-            onPressed: () => _deleteNote(note),
+        return Card(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onLongPress: () => _deleteNote(note),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          note.content,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.45,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          note.timestamp,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.delete_outline, size: 18,
+                        color: theme.colorScheme.onSurfaceVariant),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => _deleteNote(note),
+                  ),
+                ],
+              ),
+            ),
           ),
         );
       },

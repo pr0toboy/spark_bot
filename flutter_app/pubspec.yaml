@@ -1,6 +1,6 @@
 name: spark_app
 description: Spark — assistant personnel CLI disponible sur web et mobile.
-version: 1.6.0+9
+version: 1.7.0+10
 publish_to: none
 
 environment:

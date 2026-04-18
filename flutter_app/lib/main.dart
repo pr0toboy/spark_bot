@@ -6,6 +6,7 @@ import 'screens/habit_screen.dart';
 import 'screens/notes_screen.dart';
 import 'screens/settings_screen.dart';
 import 'services/api_service.dart';
+import 'theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,10 +22,9 @@ class SparkApp extends StatelessWidget {
     return MaterialApp(
       title: 'Spark',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6C63FF)),
-        useMaterial3: true,
-      ),
+      theme: buildNotionTheme(Brightness.light),
+      darkTheme: buildNotionTheme(Brightness.dark),
+      themeMode: ThemeMode.system,
       home: const _Shell(),
     );
   }
@@ -51,19 +51,26 @@ class _ShellState extends State<_Shell> {
 
   @override
   Widget build(BuildContext context) {
+    final border = Theme.of(context).colorScheme.outline;
     return Scaffold(
       body: IndexedStack(index: _index, children: _screens),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: 'Chat'),
-          NavigationDestination(icon: Icon(Icons.terminal_outlined), selectedIcon: Icon(Icons.terminal), label: 'Commandes'),
-          NavigationDestination(icon: Icon(Icons.currency_bitcoin), selectedIcon: Icon(Icons.currency_bitcoin), label: 'Crypto'),
-          NavigationDestination(icon: Icon(Icons.self_improvement_outlined), selectedIcon: Icon(Icons.self_improvement), label: 'Habitudes'),
-          NavigationDestination(icon: Icon(Icons.note_outlined), selectedIcon: Icon(Icons.note), label: 'Notes'),
-          NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Paramètres'),
-        ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: border)),
+        ),
+        child: NavigationBar(
+          selectedIndex: _index,
+          onDestinationSelected: (i) => setState(() => _index = i),
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: ''),
+            NavigationDestination(icon: Icon(Icons.terminal_outlined), selectedIcon: Icon(Icons.terminal), label: ''),
+            NavigationDestination(icon: Icon(Icons.currency_bitcoin), selectedIcon: Icon(Icons.currency_bitcoin), label: ''),
+            NavigationDestination(icon: Icon(Icons.self_improvement_outlined), selectedIcon: Icon(Icons.self_improvement), label: ''),
+            NavigationDestination(icon: Icon(Icons.note_outlined), selectedIcon: Icon(Icons.note), label: ''),
+            NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: ''),
+          ],
+        ),
       ),
     );
   }
