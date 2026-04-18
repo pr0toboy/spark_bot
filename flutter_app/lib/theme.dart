@@ -77,7 +77,7 @@ ThemeData buildNotionTheme(Brightness brightness) {
       ),
       iconTheme: IconThemeData(color: subtle, size: 20),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       elevation: 0,
       color: surface,
       margin: EdgeInsets.zero,
@@ -146,7 +146,7 @@ ThemeData buildNotionTheme(Brightness brightness) {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       side: BorderSide(color: border),
     ),
-    tabBarTheme: TabBarTheme(
+    tabBarTheme: TabBarThemeData(
       labelColor: text,
       unselectedLabelColor: subtle,
       indicatorColor: text,
@@ -201,7 +201,7 @@ ThemeData buildNotionTheme(Brightness brightness) {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       ),
     ),
-    dialogTheme: DialogTheme(
+    dialogTheme: DialogThemeData(
       backgroundColor: surface,
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

@@ -163,3 +163,40 @@ class HabitCheckResult(BaseModel):
     done_today: bool
     streak: int
     best_streak: int
+
+
+# ── Agents ────────────────────────────────────────────────────────────────────
+
+class AgentCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    type: str
+    url: str = Field(min_length=1, max_length=2048)
+    keywords: list[str] = []
+    interval_minutes: int = 60
+
+
+class AgentUpdate(BaseModel):
+    url: str | None = None
+    keywords: list[str] | None = None
+    enabled: bool | None = None
+    interval_minutes: int | None = None
+
+
+class AgentItem(BaseModel):
+    id: int
+    name: str
+    type: str
+    url: str
+    keywords: list[str]
+    enabled: bool
+    interval_minutes: int
+    last_run: str | None = None
+
+
+class AgentRunItem(BaseModel):
+    id: int
+    agent_id: int
+    timestamp: str
+    status: str
+    summary: str
+    items: list[dict]

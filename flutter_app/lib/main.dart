@@ -1,4 +1,7 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'screens/agents_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/commands_screen.dart';
 import 'screens/crypto_screen.dart';
@@ -8,10 +11,32 @@ import 'screens/settings_screen.dart';
 import 'services/api_service.dart';
 import 'theme.dart';
 
+@pragma('vm:entry-point')
+Future<void> _bgMessageHandler(RemoteMessage _) async {
+  await Firebase.initializeApp();
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(_bgMessageHandler);
   await ApiService().init();
+  await _registerPushToken();
   runApp(const SparkApp());
+}
+
+Future<void> _registerPushToken() async {
+  try {
+    final messaging = FirebaseMessaging.instance;
+    await messaging.requestPermission(alert: true, badge: true, sound: true);
+    final token = await messaging.getToken();
+    if (token != null) {
+      await ApiService().registerPushToken(token);
+    }
+    messaging.onTokenRefresh.listen((t) => ApiService().registerPushToken(t));
+  } catch (_) {
+    // Firebase not configured yet — silent fail
+  }
 }
 
 class SparkApp extends StatelessWidget {
@@ -43,6 +68,7 @@ class _ShellState extends State<_Shell> {
   static const _screens = [
     ChatScreen(),
     CommandsScreen(),
+    AgentsScreen(),
     CryptoScreen(),
     HabitScreen(),
     NotesScreen(),
@@ -65,6 +91,7 @@ class _ShellState extends State<_Shell> {
           destinations: const [
             NavigationDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: ''),
             NavigationDestination(icon: Icon(Icons.terminal_outlined), selectedIcon: Icon(Icons.terminal), label: ''),
+            NavigationDestination(icon: Icon(Icons.smart_toy_outlined), selectedIcon: Icon(Icons.smart_toy), label: ''),
             NavigationDestination(icon: Icon(Icons.currency_bitcoin), selectedIcon: Icon(Icons.currency_bitcoin), label: ''),
             NavigationDestination(icon: Icon(Icons.self_improvement_outlined), selectedIcon: Icon(Icons.self_improvement), label: ''),
             NavigationDestination(icon: Icon(Icons.note_outlined), selectedIcon: Icon(Icons.note), label: ''),

@@ -234,4 +234,32 @@ class ApiService {
 
   Future<void> updateSettings(Map<String, dynamic> updates) =>
       _post('/api/settings', updates);
+
+  // --- Agents ---
+
+  Future<List<Map<String, dynamic>>> getAgents() async {
+    final list = await _getList('/api/agents');
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> createAgent(Map<String, dynamic> body) =>
+      _post('/api/agents', body);
+
+  Future<void> toggleAgent(int id, bool enabled) =>
+      _patch('/api/agents/$id', {'enabled': enabled});
+
+  Future<void> deleteAgent(int id) => _delete('/api/agents/$id');
+
+  Future<Map<String, dynamic>> runAgent(int id) =>
+      _post('/api/agents/$id/run', {});
+
+  Future<List<Map<String, dynamic>>> getAgentRuns(int id) async {
+    final list = await _getList('/api/agents/$id/runs');
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  // --- Push ---
+
+  Future<void> registerPushToken(String token) =>
+      _post('/api/agents/push/token', {'token': token});
 }
