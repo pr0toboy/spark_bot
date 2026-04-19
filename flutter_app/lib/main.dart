@@ -63,13 +63,13 @@ class _Shell extends StatefulWidget {
 }
 
 class _ShellState extends State<_Shell> {
-  int _index = 0;
+  int _index = 3; // Chat au centre par défaut
 
   static const _screens = [
-    ChatScreen(),
     CommandsScreen(),
     AgentsScreen(),
     CryptoScreen(),
+    ChatScreen(),   // index 3 = centre
     HabitScreen(),
     NotesScreen(),
     SettingsScreen(),
@@ -89,13 +89,13 @@ class _ShellState extends State<_Shell> {
           onDestinationSelected: (i) => setState(() => _index = i),
           labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
           destinations: const [
-            NavigationDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: ''),
-            NavigationDestination(icon: Icon(Icons.terminal_outlined), selectedIcon: Icon(Icons.terminal), label: ''),
-            NavigationDestination(icon: Icon(Icons.smart_toy_outlined), selectedIcon: Icon(Icons.smart_toy), label: ''),
-            NavigationDestination(icon: Icon(Icons.currency_bitcoin), selectedIcon: Icon(Icons.currency_bitcoin), label: ''),
+            NavigationDestination(icon: Icon(Icons.terminal_outlined),      selectedIcon: Icon(Icons.terminal),          label: ''),
+            NavigationDestination(icon: Icon(Icons.smart_toy_outlined),     selectedIcon: Icon(Icons.smart_toy),         label: ''),
+            NavigationDestination(icon: Icon(Icons.currency_bitcoin),       selectedIcon: Icon(Icons.currency_bitcoin),  label: ''),
+            NavigationDestination(icon: Icon(Icons.chat_bubble_outline),    selectedIcon: Icon(Icons.chat_bubble),       label: ''),
             NavigationDestination(icon: Icon(Icons.self_improvement_outlined), selectedIcon: Icon(Icons.self_improvement), label: ''),
-            NavigationDestination(icon: Icon(Icons.note_outlined), selectedIcon: Icon(Icons.note), label: ''),
-            NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: ''),
+            NavigationDestination(icon: Icon(Icons.note_outlined),          selectedIcon: Icon(Icons.note),              label: ''),
+            NavigationDestination(icon: Icon(Icons.settings_outlined),      selectedIcon: Icon(Icons.settings),          label: ''),
           ],
         ),
       ),

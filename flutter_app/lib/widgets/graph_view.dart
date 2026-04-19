@@ -169,8 +169,8 @@ class _GraphViewState extends State<GraphView> {
     final cx = (minX + maxX) / 2;
     final cy = (minY + maxY) / 2;
     _transformCtrl.value = Matrix4.identity()
-      ..translate(viewSize.width / 2 - cx * s, viewSize.height / 2 - cy * s)
-      ..scale(s);
+      ..translateByDouble(viewSize.width / 2 - cx * s, viewSize.height / 2 - cy * s, 0.0, 1.0)
+      ..scaleByDouble(s, s, 1.0, 1.0);
   }
 
   GraphNode? _nodeAt(Offset canvasPos) {
@@ -188,10 +188,10 @@ class _GraphViewState extends State<GraphView> {
   @override
   Widget build(BuildContext context) {
     if (_nodes.isEmpty) {
-      return Center(
+      return const Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: const [
+          children: [
             Icon(Icons.grain, size: 48, color: Colors.white24),
             SizedBox(height: 12),
             Text('Aucune note — crée des notes avec [[liens]] pour voir le graph.'),
@@ -256,7 +256,7 @@ class _GraphPainter extends CustomPainter {
     final nodeMap = {for (final n in nodes) n.id: n};
 
     final edgePaint = Paint()
-      ..color = Colors.white.withOpacity(0.18)
+      ..color = Colors.white.withValues(alpha: 0.18)
       ..strokeWidth = 1.2
       ..style = PaintingStyle.stroke;
 
@@ -275,7 +275,7 @@ class _GraphPainter extends CustomPainter {
         node.position,
         nodeRadius + 4,
         Paint()
-          ..color = color.withOpacity(0.15)
+          ..color = color.withValues(alpha: 0.15)
           ..style = PaintingStyle.fill,
       );
 
@@ -284,7 +284,7 @@ class _GraphPainter extends CustomPainter {
         node.position,
         nodeRadius,
         Paint()
-          ..color = color.withOpacity(0.85)
+          ..color = color.withValues(alpha: 0.85)
           ..style = PaintingStyle.fill,
       );
 

@@ -279,7 +279,6 @@ class _CryptoScreenState extends State<CryptoScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Crypto'),
@@ -499,7 +498,7 @@ class _TrendTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           child: Row(
             children: [
-              Icon(Icons.local_fire_department_outlined,
+              const Icon(Icons.local_fire_department_outlined,
                   size: 16, color: kNotionOrange),
               const SizedBox(width: 12),
               Expanded(
@@ -663,9 +662,9 @@ class _AlertTile extends StatelessWidget {
     final color   = up ? kNotionGreen : kNotionRed;
     final label   = up ? '>' : '<';
     // Pre-computed opacity colors for the icon container
-    final iconBg     = alert.active ? color.withOpacity(0.10) : color.withOpacity(0.05);
-    final iconBorder = alert.active ? color.withOpacity(0.30) : color.withOpacity(0.15);
-    final iconColor  = alert.active ? color : color.withOpacity(0.4);
+    final iconBg     = alert.active ? color.withValues(alpha: 0.10) : color.withValues(alpha: 0.05);
+    final iconBorder = alert.active ? color.withValues(alpha: 0.30) : color.withValues(alpha: 0.15);
+    final iconColor  = alert.active ? color : color.withValues(alpha: 0.4);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),

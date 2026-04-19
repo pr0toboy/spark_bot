@@ -304,14 +304,14 @@ class _CommandsScreenState extends State<CommandsScreen> {
 class _CommandTile extends StatelessWidget {
   final _Cmd cmd;
   final VoidCallback? onTap;
-  const _CommandTile({required this.cmd, this.onTap, super.key});
+  const _CommandTile({required this.cmd, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme    = Theme.of(context);
     final disabled = onTap == null;
     final iconColor = disabled
-        ? theme.colorScheme.onSurfaceVariant.withOpacity(0.4)
+        ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4)
         : theme.colorScheme.onSurfaceVariant;
 
     return Padding(
@@ -346,7 +346,7 @@ class _CommandTile extends StatelessWidget {
                           fontWeight: FontWeight.w500,
                           fontSize: 14,
                           color: disabled
-                              ? theme.colorScheme.onSurfaceVariant.withOpacity(0.5)
+                              ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
                               : theme.colorScheme.onSurface,
                         ),
                       ),
@@ -355,7 +355,7 @@ class _CommandTile extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           color: disabled
-                              ? theme.colorScheme.onSurfaceVariant.withOpacity(0.4)
+                              ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4)
                               : theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -368,7 +368,7 @@ class _CommandTile extends StatelessWidget {
                       ? Icons.chevron_right
                       : Icons.play_arrow_rounded,
                   size: 16,
-                  color: theme.colorScheme.onSurfaceVariant.withOpacity(disabled ? 0.3 : 0.5),
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: disabled ? 0.3 : 0.5),
                 ),
               ],
             ),

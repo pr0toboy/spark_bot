@@ -185,7 +185,6 @@ class _HabitScreenState extends State<HabitScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Habitudes'),
@@ -352,7 +351,7 @@ class _ProgressHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final pct   = total == 0 ? 0.0 : done / total;
     final theme = Theme.of(context);
-    final completeColor = kNotionGreen;
+    const completeColor = kNotionGreen;
     final activeColor   = theme.colorScheme.primary;
 
     return Card(
@@ -454,10 +453,10 @@ class _HabitTile extends StatelessWidget {
                   Row(
                     children: [
                       if (habit.streak >= 2) ...[
-                        Icon(Icons.local_fire_department, size: 12, color: kNotionOrange),
+                        const Icon(Icons.local_fire_department, size: 12, color: kNotionOrange),
                         const SizedBox(width: 2),
                         Text('${habit.streak}',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 11,
                               color: kNotionOrange,
                               fontWeight: FontWeight.w600,

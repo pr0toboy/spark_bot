@@ -13,7 +13,6 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final _api = ApiService();
   Map<String, dynamic> _settings = {};
-  Map<String, dynamic> _models = {};
   List<Map<String, dynamic>> _tools = [];
   List<Skill> _skills = [];
   List<Skill> _presets = [];
@@ -30,17 +29,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final results = await Future.wait([
         _api.getSettings(),
-        _api.getModels(),
         _api.getTools(),
         _api.getSkills(),
         _api.getPresets(),
       ]);
       setState(() {
         _settings = results[0] as Map<String, dynamic>;
-        _models = results[1] as Map<String, dynamic>;
-        _tools = (results[2] as List).cast<Map<String, dynamic>>();
-        _skills = (results[3] as List<Skill>);
-        _presets = (results[4] as List<Skill>);
+        _tools = (results[1] as List).cast<Map<String, dynamic>>();
+        _skills = (results[2] as List<Skill>);
+        _presets = (results[3] as List<Skill>);
       });
     } catch (e) {
       _showError(e.toString());
@@ -234,11 +231,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ? Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: kNotionGreen.withOpacity(0.1),
+                          color: kNotionGreen.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(5),
-                          border: Border.all(color: kNotionGreen.withOpacity(0.3)),
+                          border: Border.all(color: kNotionGreen.withValues(alpha: 0.3)),
                         ),
-                        child: Text('actif',
+                        child: const Text('actif',
                             style: TextStyle(
                               fontSize: 11,
                               color: kNotionGreen,

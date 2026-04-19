@@ -1,31 +1,40 @@
 import 'package:flutter/material.dart';
 
-// ─── Palette Notion ──────────────────────────────────────────────────────────
+// ─── Spark palette ───────────────────────────────────────────────────────────
 
-const kNotionTextLight   = Color(0xFF37352F);
-const kNotionTextDark    = Color(0xFFE3E2E0);
-const kNotionGrayLight   = Color(0xFF9B9A97);
-const kNotionGrayDark    = Color(0xFF787774);
-const kNotionBorderLight = Color(0xFFE3E2E0);
-const kNotionBorderDark  = Color(0xFF373737);
-const kNotionBgLight     = Color(0xFFF7F6F3);
-const kNotionBgDark      = Color(0xFF191919);
-const kNotionCardLight   = Color(0xFFFFFFFF);
-const kNotionCardDark    = Color(0xFF252525);
-const kNotionSubLight    = Color(0xFFF1F1EF);
-const kNotionSubDark     = Color(0xFF2F2F2F);
-const kNotionAccent      = Color(0xFF2383E2);
-const kNotionRed         = Color(0xFFEB5757);
-const kNotionGreen       = Color(0xFF0F7B6C);
-const kNotionOrange      = Color(0xFFD9730D);
+const kSparkOrange = Color(0xFFF97316);
+const kSparkYellow = Color(0xFFF59E0B);
+const kSparkTeal   = Color(0xFF0D9488);
+const kSparkCoral  = Color(0xFFF43F5E);
+const kSparkBlue   = Color(0xFF3B82F6);
 
-// Pre-computed opacity variants (avoids Color.withOpacity() allocations on hot paths)
-const kNotionGreenBg     = Color(0x260F7B6C); // kNotionGreen @ 15%
-const kNotionGreenBorder = Color(0x660F7B6C); // kNotionGreen @ 40%
+// Light
+const kBgLight   = Color(0xFFF5EFE6);
+const kSurfLight = Color(0xFFFDFAF5);
+const kTextLight = Color(0xFF2B1D0E);
+const kSubtLight = Color(0xFF9C856A);
+const kBordLight = Color(0xFFE8DDD0);
+const kSubLight  = Color(0xFFEEE6DA);
+
+// Dark
+const kBgDark    = Color(0xFF1C1208);
+const kSurfDark  = Color(0xFF261A0E);
+const kTextDark  = Color(0xFFF5EFE6);
+const kSubtDark  = Color(0xFF9C856A);
+const kBordDark  = Color(0xFF3D2D1E);
+const kSubDark   = Color(0xFF301E10);
+
+// ─── Semantic aliases (backward compat with screen files) ────────────────────
+
+const kNotionGreen       = kSparkTeal;
+const kNotionRed         = kSparkCoral;
+const kNotionAccent      = kSparkBlue;
+const kNotionOrange      = kSparkOrange;
+const kNotionGreenBg     = Color(0x260D9488); // kSparkTeal @ 15%
+const kNotionGreenBorder = Color(0x660D9488); // kSparkTeal @ 40%
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/// Thin divider line for AppBar.bottom, matching the Notion border style.
 PreferredSize notionAppBarDivider(BuildContext context) => PreferredSize(
       preferredSize: const Size.fromHeight(1),
       child: Divider(height: 1, color: Theme.of(context).colorScheme.outline),
@@ -35,20 +44,23 @@ PreferredSize notionAppBarDivider(BuildContext context) => PreferredSize(
 
 ThemeData buildNotionTheme(Brightness brightness) {
   final isDark  = brightness == Brightness.dark;
-  final bg      = isDark ? kNotionBgDark      : kNotionBgLight;
-  final surface = isDark ? kNotionCardDark    : kNotionCardLight;
-  final text    = isDark ? kNotionTextDark    : kNotionTextLight;
-  final subtle  = isDark ? kNotionGrayDark    : kNotionGrayLight;
-  final border  = isDark ? kNotionBorderDark  : kNotionBorderLight;
-  final sub     = isDark ? kNotionSubDark     : kNotionSubLight;
+  final bg      = isDark ? kBgDark   : kBgLight;
+  final surface = isDark ? kSurfDark : kSurfLight;
+  final text    = isDark ? kTextDark : kTextLight;
+  final subtle  = isDark ? kSubtDark : kSubtLight;
+  final border  = isDark ? kBordDark : kBordLight;
+  final sub     = isDark ? kSubDark  : kSubLight;
+
+  const primary   = kSparkOrange;
+  const onPrimary = Colors.white;
 
   final scheme = ColorScheme(
     brightness: brightness,
-    primary: text,
-    onPrimary: isDark ? kNotionBgDark : Colors.white,
+    primary: primary,
+    onPrimary: onPrimary,
     secondary: subtle,
     onSecondary: surface,
-    error: kNotionRed,
+    error: kSparkCoral,
     onError: Colors.white,
     surface: surface,
     onSurface: text,
@@ -82,23 +94,23 @@ ThemeData buildNotionTheme(Brightness brightness) {
       color: surface,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         side: BorderSide(color: border),
       ),
     ),
     dividerTheme: DividerThemeData(color: border, space: 1, thickness: 1),
     inputDecorationTheme: InputDecorationTheme(
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(color: border),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(color: border),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: text, width: 1.5),
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: primary, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       fillColor: surface,
@@ -107,17 +119,17 @@ ThemeData buildNotionTheme(Brightness brightness) {
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: text,
+        foregroundColor: primary,
         textStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: text,
-        foregroundColor: isDark ? kNotionBgDark : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+        backgroundColor: primary,
+        foregroundColor: onPrimary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       ),
     ),
@@ -126,10 +138,10 @@ ThemeData buildNotionTheme(Brightness brightness) {
       elevation: 0,
       shadowColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
-      indicatorColor: sub,
+      indicatorColor: const Color(0x26F97316), // orange @ 15%
       iconTheme: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
-          return IconThemeData(color: text, size: 22);
+          return const IconThemeData(color: primary, size: 22);
         }
         return IconThemeData(color: subtle, size: 22);
       }),
@@ -137,19 +149,19 @@ ThemeData buildNotionTheme(Brightness brightness) {
     ),
     chipTheme: ChipThemeData(
       backgroundColor: sub,
-      selectedColor: isDark ? const Color(0xFF454442) : const Color(0xFFE3E2E0),
+      selectedColor: isDark ? const Color(0xFF3D2D1E) : const Color(0xFFE8DDD0),
       labelStyle: TextStyle(color: text, fontSize: 13),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: border),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       side: BorderSide(color: border),
     ),
     tabBarTheme: TabBarThemeData(
-      labelColor: text,
+      labelColor: primary,
       unselectedLabelColor: subtle,
-      indicatorColor: text,
+      indicatorColor: primary,
       dividerColor: border,
       indicatorSize: TabBarIndicatorSize.tab,
       labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
@@ -157,22 +169,22 @@ ThemeData buildNotionTheme(Brightness brightness) {
       tabAlignment: TabAlignment.fill,
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
-      backgroundColor: text,
-      foregroundColor: isDark ? kNotionBgDark : Colors.white,
+      backgroundColor: primary,
+      foregroundColor: onPrimary,
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: text,
       contentTextStyle: TextStyle(
-        color: isDark ? kNotionBgDark : Colors.white,
+        color: isDark ? kBgDark : Colors.white,
         fontSize: 13,
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       behavior: SnackBarBehavior.floating,
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(
-      color: text,
+      color: primary,
       linearTrackColor: border,
       circularTrackColor: border,
     ),
@@ -180,7 +192,7 @@ ThemeData buildNotionTheme(Brightness brightness) {
       thumbColor: WidgetStateProperty.resolveWith((s) =>
           s.contains(WidgetState.selected) ? Colors.white : subtle),
       trackColor: WidgetStateProperty.resolveWith((s) =>
-          s.contains(WidgetState.selected) ? text : border),
+          s.contains(WidgetState.selected) ? primary : border),
       trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
     ),
     listTileTheme: ListTileThemeData(
@@ -192,10 +204,10 @@ ThemeData buildNotionTheme(Brightness brightness) {
     segmentedButtonTheme: SegmentedButtonThemeData(
       style: SegmentedButton.styleFrom(
         backgroundColor: sub,
-        selectedBackgroundColor: isDark ? const Color(0xFF454442) : const Color(0xFFE3E2E0),
+        selectedBackgroundColor: isDark ? const Color(0xFF3D2D1E) : const Color(0xFFE8DDD0),
         foregroundColor: subtle,
         selectedForegroundColor: text,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         side: BorderSide(color: border),
         textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -204,7 +216,7 @@ ThemeData buildNotionTheme(Brightness brightness) {
     dialogTheme: DialogThemeData(
       backgroundColor: surface,
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       titleTextStyle: TextStyle(
         color: text,
         fontSize: 15,
@@ -214,7 +226,7 @@ ThemeData buildNotionTheme(Brightness brightness) {
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
       ),
       dragHandleColor: border,
     ),
