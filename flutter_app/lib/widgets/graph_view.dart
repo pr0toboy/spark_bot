@@ -169,8 +169,8 @@ class _GraphViewState extends State<GraphView> {
     final cx = (minX + maxX) / 2;
     final cy = (minY + maxY) / 2;
     _transformCtrl.value = Matrix4.identity()
-      ..translateByDouble(viewSize.width / 2 - cx * s, viewSize.height / 2 - cy * s, 0.0, 1.0)
-      ..scaleByDouble(s, s, 1.0, 1.0);
+      ..translate(viewSize.width / 2 - cx * s, viewSize.height / 2 - cy * s, 0.0)
+      ..scale(s, s, 1.0);
   }
 
   GraphNode? _nodeAt(Offset canvasPos) {
