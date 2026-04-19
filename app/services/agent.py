@@ -1,7 +1,5 @@
 import hashlib
 import json
-import feedparser
-import requests
 from datetime import datetime, timezone
 
 from app.context import get_conn, DATA_DIR
@@ -76,6 +74,7 @@ def send_push(title: str, body: str) -> int:
 
 
 def _fetch_rss(url: str, keywords: list[str]) -> list[dict]:
+    import feedparser
     feed = feedparser.parse(url)
     kw = [k.lower() for k in keywords]
     results = []
@@ -92,6 +91,7 @@ def _fetch_rss(url: str, keywords: list[str]) -> list[dict]:
 
 
 def _fetch_web(url: str, prev_hash: str | None) -> tuple[list[dict], str]:
+    import requests
     r = requests.get(url, timeout=15, allow_redirects=True)
     r.raise_for_status()
     h = hashlib.sha256(r.text.encode()).hexdigest()
