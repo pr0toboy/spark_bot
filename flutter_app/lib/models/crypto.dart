@@ -1,11 +1,13 @@
 class CryptoMarketItem {
   final String symbol;
   final double priceUsd;
+  final double priceEur;
   final double change24h;
 
   CryptoMarketItem.fromJson(Map<String, dynamic> j)
       : symbol = j['symbol'] as String,
         priceUsd = (j['price_usd'] as num).toDouble(),
+        priceEur = (j['price_eur'] as num? ?? 0).toDouble(),
         change24h = (j['change_24h'] as num).toDouble();
 }
 
@@ -15,19 +17,22 @@ class CryptoWallet {
   final String chain;
   final double? balance;
   final double? balanceUsd;
+  final double? balanceEur;
 
   CryptoWallet.fromJson(Map<String, dynamic> j)
       : label = j['label'] as String,
         address = j['address'] as String,
         chain = j['chain'] as String,
         balance = (j['balance'] as num?)?.toDouble(),
-        balanceUsd = (j['balance_usd'] as num?)?.toDouble();
+        balanceUsd = (j['balance_usd'] as num?)?.toDouble(),
+        balanceEur = (j['balance_eur'] as num?)?.toDouble();
 }
 
 class CryptoPortfolio {
   final List<CryptoWallet> wallets;
   final List<CryptoMarketItem> market;
   final double? totalUsd;
+  final double? totalEur;
 
   CryptoPortfolio.fromJson(Map<String, dynamic> j)
       : wallets = (j['wallets'] as List)
@@ -36,7 +41,8 @@ class CryptoPortfolio {
         market = (j['market'] as List)
             .map((e) => CryptoMarketItem.fromJson(e as Map<String, dynamic>))
             .toList(),
-        totalUsd = (j['total_usd'] as num?)?.toDouble();
+        totalUsd = (j['total_usd'] as num?)?.toDouble(),
+        totalEur = (j['total_eur'] as num?)?.toDouble();
 }
 
 class CryptoAlert {

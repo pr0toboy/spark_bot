@@ -13,6 +13,17 @@ String _fmtUsd(double v) {
   return '\$${v.toStringAsExponential(2)}';
 }
 
+String _fmtEur(double v) {
+  if (v == 0) return '€0.00';
+  if (v >= 1e9) return '€${(v / 1e9).toStringAsFixed(2)}B';
+  if (v >= 1e6) return '€${(v / 1e6).toStringAsFixed(2)}M';
+  if (v >= 1)   return '€${v.toStringAsFixed(2)}';
+  if (v >= 0.0001) return '€${v.toStringAsFixed(6)}';
+  return '€${v.toStringAsExponential(2)}';
+}
+
+String _fmtFiat(double v, bool useEur) => useEur ? _fmtEur(v) : _fmtUsd(v);
+
 const _kChainTicker = {
   'btc': 'BTC', 'xpub': 'BTC', 'eth': 'ETH',
   'avax': 'AVAX', 'sol': 'SOL', 'dot': 'DOT',
@@ -42,6 +53,7 @@ class _CryptoScreenState extends State<CryptoScreen>
 
   CryptoPortfolio? _portfolio;
   bool _loadingPortfolio = false;
+  bool _useEur = false;
 
   List<CryptoAlert> _alerts = [];
   bool _loadingAlerts = true;
@@ -283,6 +295,13 @@ class _CryptoScreenState extends State<CryptoScreen>
       appBar: AppBar(
         title: const Text('Crypto'),
         actions: [
+          TextButton(
+            onPressed: () => setState(() => _useEur = !_useEur),
+            child: Text(
+              _useEur ? '€' : '\$',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
@@ -351,7 +370,7 @@ class _CryptoScreenState extends State<CryptoScreen>
               mainAxisSpacing: 8,
             ),
             itemCount: _market.length,
-            itemBuilder: (_, i) => _MarketCard(_market[i]),
+            itemBuilder: (_, i) => _MarketCard(_market[i], useEur: _useEur),
           ),
           if (_trending.isNotEmpty) ...[
             const SizedBox(height: 20),
@@ -381,7 +400,12 @@ class _CryptoScreenState extends State<CryptoScreen>
       child: ListView(
         padding: const EdgeInsets.fromLTRB(12, 16, 12, 80),
         children: [
-          if (p.totalUsd != null) _TotalCard(p.totalUsd!),
+          if (p.totalUsd != null || p.totalEur != null)
+            _TotalCard(
+              totalUsd: p.totalUsd ?? 0,
+              totalEur: p.totalEur ?? 0,
+              useEur: _useEur,
+            ),
           const SizedBox(height: 12),
           if (p.wallets.isEmpty)
             Padding(
@@ -405,6 +429,7 @@ class _CryptoScreenState extends State<CryptoScreen>
             const NotionSectionLabel('Wallets', Icons.account_balance_wallet_outlined),
             const SizedBox(height: 8),
             ...p.wallets.map((w) => _WalletTile(w,
+                useEur: _useEur,
                 onRename: () => _renameWallet(w),
                 onDelete: () => _deleteWallet(w))),
           ],
@@ -444,7 +469,8 @@ class _CryptoScreenState extends State<CryptoScreen>
 
 class _MarketCard extends StatelessWidget {
   final CryptoMarketItem item;
-  const _MarketCard(this.item);
+  final bool useEur;
+  const _MarketCard(this.item, {this.useEur = false});
 
   @override
   Widget build(BuildContext context) {
@@ -465,7 +491,7 @@ class _MarketCard extends StatelessWidget {
                   color: theme.colorScheme.onSurface,
                 )),
             const SizedBox(height: 2),
-            Text(_fmtUsd(item.priceUsd),
+            Text(_fmtFiat(useEur ? item.priceEur : item.priceUsd, useEur),
                 style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface)),
             const SizedBox(height: 2),
             Row(
@@ -540,7 +566,9 @@ class _TrendTile extends StatelessWidget {
 
 class _TotalCard extends StatelessWidget {
   final double totalUsd;
-  const _TotalCard(this.totalUsd);
+  final double totalEur;
+  final bool useEur;
+  const _TotalCard({required this.totalUsd, required this.totalEur, this.useEur = false});
 
   @override
   Widget build(BuildContext context) {
@@ -558,7 +586,7 @@ class _TotalCard extends StatelessWidget {
                 )),
             const SizedBox(height: 4),
             Text(
-              _fmtUsd(totalUsd),
+              _fmtFiat(useEur ? totalEur : totalUsd, useEur),
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w700,
@@ -575,9 +603,10 @@ class _TotalCard extends StatelessWidget {
 
 class _WalletTile extends StatelessWidget {
   final CryptoWallet wallet;
+  final bool useEur;
   final VoidCallback onRename;
   final VoidCallback onDelete;
-  const _WalletTile(this.wallet, {required this.onRename, required this.onDelete});
+  const _WalletTile(this.wallet, {this.useEur = false, required this.onRename, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -620,10 +649,10 @@ class _WalletTile extends StatelessWidget {
                     if (wallet.balance != null) ...[
                       const SizedBox(height: 2),
                       Text(
-                        _fmtBal(wallet.balance!, wallet.chain) +
-                            (wallet.balanceUsd != null
-                                ? '  ≈ ${_fmtUsd(wallet.balanceUsd!)}'
-                                : ''),
+                        _fmtBal(wallet.balance!, wallet.chain) + (() {
+                          final fiatVal = useEur ? wallet.balanceEur : wallet.balanceUsd;
+                          return fiatVal != null ? '  ≈ ${_fmtFiat(fiatVal, useEur)}' : '';
+                        })(),
                         style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface),
                       ),
                     ],

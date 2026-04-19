@@ -77,6 +77,7 @@ class CryptoWalletItem(BaseModel):
     chain: str
     balance: float | None = None
     balance_usd: float | None = None
+    balance_eur: float | None = None
 
 
 class CryptoWalletCreate(BaseModel):
@@ -91,6 +92,7 @@ class CryptoWalletRename(BaseModel):
 class CryptoMarketItem(BaseModel):
     symbol: str
     price_usd: float
+    price_eur: float = 0.0
     change_24h: float
 
 
@@ -98,11 +100,13 @@ class CryptoPortfolio(BaseModel):
     wallets: list[CryptoWalletItem]
     market: list[CryptoMarketItem]
     total_usd: float | None = None
+    total_eur: float | None = None
 
 
 class CryptoPriceItem(BaseModel):
     symbol: str
     price_usd: float
+    price_eur: float = 0.0
     change_24h: float
     market_cap: float | None = None
 

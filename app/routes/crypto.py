@@ -118,7 +118,7 @@ def _prices(coin_ids: list[str]) -> dict[str, dict]:
         return cached[1]
     try:
         r = requests.get(f"{_CG}/simple/price", headers=_HDR, timeout=8, params={
-            "ids": ",".join(coin_ids), "vs_currencies": "usd",
+            "ids": ",".join(coin_ids), "vs_currencies": "usd,eur",
             "include_24hr_change": "true", "include_market_cap": "true",
         })
         if r.status_code != 200:
@@ -355,6 +355,7 @@ def get_market():
         CryptoMarketItem(
             symbol=sym,
             price_usd=d.get("usd", 0),
+            price_eur=d.get("eur", 0.0),
             change_24h=d.get("usd_24h_change") or 0,
         )
         for sym, cid in _TOP_COINS
@@ -450,23 +451,29 @@ def get_portfolio():
 
     wallets: list[CryptoWalletItem] = []
     total_usd = 0.0
+    total_eur = 0.0
     for label, address, chain in wallet_rows:
         bal = bals.get((address, chain))
         bal_usd: float | None = None
+        bal_eur: float | None = None
         if bal is not None:
             p = price_cache.get(_CHAIN_COIN.get(chain, ""), {})
             if p.get("usd"):
                 bal_usd = bal * p["usd"]
                 total_usd += bal_usd
+            if p.get("eur"):
+                bal_eur = bal * p["eur"]
+                total_eur += bal_eur
         wallets.append(CryptoWalletItem(
             label=label, address=address, chain=chain,
-            balance=bal, balance_usd=bal_usd,
+            balance=bal, balance_usd=bal_usd, balance_eur=bal_eur,
         ))
 
     market = [
         CryptoMarketItem(
             symbol=sym,
             price_usd=d.get("usd", 0),
+            price_eur=d.get("eur", 0.0),
             change_24h=d.get("usd_24h_change") or 0,
         )
         for sym, cid in _TOP_COINS
@@ -477,6 +484,7 @@ def get_portfolio():
         wallets=wallets,
         market=market,
         total_usd=total_usd if wallet_rows else None,
+        total_eur=total_eur if wallet_rows else None,
     )
 
 
@@ -488,6 +496,7 @@ def get_price(coin: str):
     return CryptoPriceItem(
         symbol=coin.upper(),
         price_usd=d.get("usd", 0),
+        price_eur=d.get("eur", 0.0),
         change_24h=d.get("usd_24h_change") or 0,
         market_cap=d.get("usd_market_cap"),
     )
