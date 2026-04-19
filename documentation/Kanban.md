@@ -3,11 +3,11 @@
 ## À faire
 
 ### Fonctionnalités
-- /translate : traduction rapide d'un mot ou d'une phrase
 - /define : définition d'un mot
 - Widget recap journalier (météo + todos + habitudes)
 - Mode hors-ligne partiel (cache local des données)
 - Graphe de notes interactif dans l'app Flutter
+- Excalidraw dans l'onglet note
 
 ### Améliorations
 - Pagination de l'historique de chat

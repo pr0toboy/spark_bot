@@ -2,12 +2,6 @@ Des idées de tâches simple ou complexe à mettre en oeuvre pour mon super bot 
 
 # Tâches simples (tâches de premier plan)
 
-- /note : enregistrer une note rapide
-- /prix : Donne le prix actuel d'une crypto
-- /alert : Fixe une alerte de prix d'une crypto
-- /habit : Suivi d’habitudes (habit tracker)
-- /weather : météo actuelle d’une ville
-- /find : Rechercher un fichier dans le disque
 - /translate : traduction rapide d’un mot ou d’une phrase
 - /download : Téléchargement de vidéo (yt-dlp)
 - /summarize : résumer un texte ou un article
@@ -23,7 +17,6 @@ Des idées de tâches simple ou complexe à mettre en oeuvre pour mon super bot 
 - /backup : lancer une sauvegarde automatique
 - /clean : nettoyer les fichiers temporaires ou inutiles
 - /upload : envoyer un fichier vers un cloud ou un serveur
-- /quote : citation inspirante aléatoire
 - /joke : blague du jour
 
 - /open : ouvre un lien, un fichier ou une app selon un alias (ex : /open projet)
