@@ -483,8 +483,8 @@ def get_portfolio():
     return CryptoPortfolio(
         wallets=wallets,
         market=market,
-        total_usd=total_usd if wallet_rows else None,
-        total_eur=total_eur if wallet_rows else None,
+        total_usd=total_usd if (wallet_rows and total_usd > 0) else None,
+        total_eur=total_eur if (wallet_rows and total_eur > 0) else None,
     )
 
 

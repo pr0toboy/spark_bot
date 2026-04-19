@@ -403,7 +403,7 @@ class _CryptoScreenState extends State<CryptoScreen>
           if (p.totalUsd != null || p.totalEur != null)
             _TotalCard(
               totalUsd: p.totalUsd ?? 0,
-              totalEur: p.totalEur ?? 0,
+              totalEur: p.totalEur,
               useEur: _useEur,
             ),
           const SizedBox(height: 12),
@@ -566,13 +566,14 @@ class _TrendTile extends StatelessWidget {
 
 class _TotalCard extends StatelessWidget {
   final double totalUsd;
-  final double totalEur;
+  final double? totalEur;
   final bool useEur;
-  const _TotalCard({required this.totalUsd, required this.totalEur, this.useEur = false});
+  const _TotalCard({required this.totalUsd, this.totalEur, this.useEur = false});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final showEur = useEur && totalEur != null;
     return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
@@ -586,7 +587,7 @@ class _TotalCard extends StatelessWidget {
                 )),
             const SizedBox(height: 4),
             Text(
-              _fmtFiat(useEur ? totalEur : totalUsd, useEur),
+              showEur ? _fmtEur(totalEur!) : _fmtUsd(totalUsd),
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w700,
