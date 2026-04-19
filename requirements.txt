@@ -1,8 +1,0 @@
-anthropic
-groq
-prompt_toolkit
-requests
-pytest
-firebase-admin
-apscheduler
-feedparser
