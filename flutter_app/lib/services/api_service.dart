@@ -41,14 +41,16 @@ class ApiService {
 
   Uri _url(String path) => Uri.parse('$_baseUrl$path');
 
+  static const _timeout = Duration(seconds: 30);
+
   Future<Map<String, dynamic>> _get(String path) async {
-    final res = await _client.get(_url(path));
+    final res = await _client.get(_url(path)).timeout(_timeout);
     _checkStatus(res);
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
   Future<List<dynamic>> _getList(String path) async {
-    final res = await _client.get(_url(path));
+    final res = await _client.get(_url(path)).timeout(_timeout);
     _checkStatus(res);
     return jsonDecode(res.body) as List<dynamic>;
   }
@@ -58,7 +60,7 @@ class ApiService {
       _url(path),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
-    );
+    ).timeout(_timeout);
     _checkStatus(res);
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
@@ -68,19 +70,25 @@ class ApiService {
       _url(path),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
-    );
+    ).timeout(_timeout);
     _checkStatus(res);
   }
 
   Future<void> _delete(String path) async {
-    final res = await _client.delete(_url(path));
+    final res = await _client.delete(_url(path)).timeout(_timeout);
     _checkStatus(res);
   }
 
   void _checkStatus(http.Response res) {
     if (res.statusCode >= 400) {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
-      throw ApiException(body['detail']?.toString() ?? 'Erreur ${res.statusCode}');
+      String detail;
+      try {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        detail = body['detail']?.toString() ?? 'Erreur ${res.statusCode}';
+      } catch (_) {
+        detail = 'Erreur ${res.statusCode}';
+      }
+      throw ApiException(detail);
     }
   }
 
@@ -267,7 +275,7 @@ class ApiService {
   // --- Backup ---
 
   Future<Uint8List> exportBackup() async {
-    final res = await _client.get(_url('/api/backup/export'));
+    final res = await _client.get(_url('/api/backup/export')).timeout(_timeout);
     _checkStatus(res);
     return res.bodyBytes;
   }
@@ -277,7 +285,7 @@ class ApiService {
       _url('/api/backup/import'),
       headers: {'Content-Type': 'application/json'},
       body: data,
-    );
+    ).timeout(_timeout);
     _checkStatus(res);
     return jsonDecode(res.body) as Map<String, dynamic>;
   }

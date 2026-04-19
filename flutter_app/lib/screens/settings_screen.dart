@@ -45,9 +45,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _presets = (results[3] as List<Skill>);
       });
     } catch (e) {
-      _showError(e.toString());
+      if (mounted) _showError(e.toString());
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 

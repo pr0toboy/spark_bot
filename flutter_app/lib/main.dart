@@ -33,9 +33,13 @@ Future<void> _registerPushToken() async {
     if (token != null) {
       await ApiService().registerPushToken(token);
     }
-    messaging.onTokenRefresh.listen((t) => ApiService().registerPushToken(t));
+    messaging.onTokenRefresh.listen((t) async {
+      try {
+        await ApiService().registerPushToken(t);
+      } catch (_) {}
+    });
   } catch (_) {
-    // Firebase not configured yet — silent fail
+    // Firebase not configured — silent fail
   }
 }
 
