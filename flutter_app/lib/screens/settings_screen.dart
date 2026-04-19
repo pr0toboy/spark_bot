@@ -1,4 +1,8 @@
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../theme.dart';
 import '../models/skill.dart';
 import '../services/api_service.dart';
@@ -12,6 +16,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final _api = ApiService();
+  bool _backupBusy = false;
   Map<String, dynamic> _settings = {};
   List<Map<String, dynamic>> _tools = [];
   List<Skill> _skills = [];
@@ -150,6 +155,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _exportBackup() async {
+    if (_backupBusy) return;
+    setState(() => _backupBusy = true);
+    try {
+      final bytes = await _api.exportBackup();
+      final dir = await getTemporaryDirectory();
+      final now = DateTime.now();
+      final name = 'spark_backup_${now.year}-'
+          '${now.month.toString().padLeft(2, '0')}-'
+          '${now.day.toString().padLeft(2, '0')}.json';
+      final file = File('${dir.path}/$name');
+      await file.writeAsBytes(bytes);
+      await Share.shareXFiles([XFile(file.path)], subject: 'Sauvegarde Spark');
+    } catch (e) {
+      if (mounted) _showError(e.toString());
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
+    }
+  }
+
+  Future<void> _importBackup() async {
+    if (_backupBusy) return;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final bytes = result.files.first.bytes;
+    if (bytes == null) return;
+    if (!mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Importer la sauvegarde'),
+        content: const Text(
+          'Cette opération remplace toutes les données actuelles (notes, habitudes, agents, crypto).\n\nContinuer ?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Importer')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _backupBusy = true);
+    try {
+      final data = await _api.importBackup(bytes);
+      final imp = data['imported'] as Map<String, dynamic>;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+            'Import réussi — ${imp['notes']} notes · ${imp['habits']} habitudes · '
+            '${imp['agents']} agents · ${imp['skills']} skills',
+          ),
+        ));
+      }
+    } catch (e) {
+      if (mounted) _showError(e.toString());
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -244,6 +315,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       )
                     : _actionBtn('Ajouter', () => _addSkill(preset: preset)),
               ),
+          ]),
+          _section('Sauvegarde', [
+            _row(
+              title: 'Exporter',
+              subtitle: 'Télécharger toutes les données Spark dans un fichier JSON',
+              leading: Icon(Icons.upload_outlined, size: 18,
+                  color: theme.colorScheme.onSurfaceVariant),
+              trailing: _backupBusy
+                  ? const SizedBox(width: 20, height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : _actionBtn('Exporter', _exportBackup),
+            ),
+            _row(
+              title: 'Importer',
+              subtitle: 'Restaurer depuis un fichier spark_backup_*.json',
+              leading: Icon(Icons.download_outlined, size: 18,
+                  color: theme.colorScheme.onSurfaceVariant),
+              trailing: _backupBusy
+                  ? const SizedBox(width: 20, height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : _actionBtn('Importer', _importBackup),
+            ),
           ]),
           const SizedBox(height: 24),
         ],

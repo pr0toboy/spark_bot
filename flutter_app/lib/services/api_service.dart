@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/crypto.dart';
@@ -262,4 +263,22 @@ class ApiService {
 
   Future<void> registerPushToken(String token) =>
       _post('/api/agents/push/token', {'token': token});
+
+  // --- Backup ---
+
+  Future<Uint8List> exportBackup() async {
+    final res = await _client.get(_url('/api/backup/export'));
+    _checkStatus(res);
+    return res.bodyBytes;
+  }
+
+  Future<Map<String, dynamic>> importBackup(Uint8List data) async {
+    final res = await _client.post(
+      _url('/api/backup/import'),
+      headers: {'Content-Type': 'application/json'},
+      body: data,
+    );
+    _checkStatus(res);
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
 }

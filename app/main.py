@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from app.routes import ai, notes, tools, skills, settings, context_route, crypto, habit, agent as agent_router
+from app.routes import ai, notes, tools, skills, settings, context_route, crypto, habit, agent as agent_router, backup
 
 _scheduler = BackgroundScheduler(daemon=True)
 
@@ -58,6 +58,7 @@ app.include_router(context_route.router)
 app.include_router(crypto.router)
 app.include_router(habit.router)
 app.include_router(agent_router.router)
+app.include_router(backup.router)
 
 
 @app.get("/health")
