@@ -237,25 +237,17 @@ def _sol_rpc(method: str, params: list) -> dict:
 def _sol_balance(addr: str) -> float | None:
     try:
         liquid = _sol_rpc("getBalance", [addr])["result"]["value"] / 1e9
-        sigs = [s["signature"] for s in
-                _sol_rpc("getSignaturesForAddress", [addr, {"limit": 50}]).get("result", [])]
-        candidates: set[str] = set()
-        for sig in sigs:
-            tx = _sol_rpc("getTransaction",
-                          [sig, {"encoding": "json", "maxSupportedTransactionVersion": 0}]).get("result")
-            if not tx or _STAKE_PRG not in tx["transaction"]["message"]["accountKeys"]:
-                continue
-            meta = tx["meta"]
-            for i, acc in enumerate(tx["transaction"]["message"]["accountKeys"]):
-                if acc in (addr, _STAKE_PRG):
-                    continue
-                if meta["postBalances"][i] >= 500_000_000:
-                    candidates.add(acc)
-        staked = 0.0
-        for acc in candidates:
-            v = _sol_rpc("getAccountInfo", [acc, {"encoding": "base64"}]).get("result", {}).get("value")
-            if v and v.get("owner") == _STAKE_PRG:
-                staked += v["lamports"] / 1e9
+        stake_resp = _sol_rpc("getProgramAccounts", [
+            _STAKE_PRG,
+            {"encoding": "base64", "filters": [
+                {"dataSize": 200},
+                {"memcmp": {"offset": 44, "bytes": addr}},
+            ]},
+        ])
+        staked = sum(
+            acc["account"]["lamports"] / 1e9
+            for acc in (stake_resp.get("result") or [])
+        )
         return liquid + staked
     except Exception:
         return None
