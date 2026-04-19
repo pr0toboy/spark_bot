@@ -240,7 +240,7 @@ spark_bot/
 │   ├── main.py          # FastAPI app
 │   ├── deps.py          # Context injection
 │   ├── models.py        # Pydantic schemas
-│   └── routes/          # ai, notes, skills, tools, settings
+│   └── routes/          # ai, notes, habits, crypto, agents, skills, tools, settings, backup
 ├── flutter_app/
 │   ├── lib/             # Dart — screens + services + models
 │   └── pubspec.yaml

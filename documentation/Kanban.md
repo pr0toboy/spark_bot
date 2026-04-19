@@ -28,7 +28,7 @@
 - Route IA `/api/ai` — Claude (Anthropic) + Groq + GLM, historique persisté
 - `/api/notes` — CRUD + export Obsidian + graphe de liens
 - `/api/habits` — tracker d'habitudes avec streaks et stats hebdomadaires
-- `/api/crypto` — marché, tendances, portfolio multi-wallet, alertes de prix
+- `/api/crypto` — marché, tendances, portfolio multi-wallet, alertes de prix, fallback EUR (`_EUR_USD_RATE`) sur tous les endpoints
 - `/api/agents` — agents automatisés (email IMAP, RSS/web filtré par IA)
 - `/api/skills` — skills personnalisés + presets
 - `/api/tools` — activation/désactivation des outils IA

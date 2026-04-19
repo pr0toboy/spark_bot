@@ -13,6 +13,7 @@
 
 | Version | Date | Changements clés |
 |---------|------|-----------------|
+| v1.9.3 | 2026-04-19 | Fix EUR crypto : fallback `_EUR_USD_RATE` sur les 3 endpoints (market, portfolio, price) |
 | v1.9.2 | 2026-04-19 | Icône Spark (logo.jpg), nom "Spark", timeout HTTP 30s, robustesse sécurité |
 | v1.9.1 | 2026-04-19 | Icône de lancement Android (flutter_launcher_icons) |
 | v1.9.0 | 2026-04-19 | Export/Import backup JSON complet |

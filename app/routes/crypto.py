@@ -362,7 +362,7 @@ def get_market():
         CryptoMarketItem(
             symbol=sym,
             price_usd=d.get("usd", 0),
-            price_eur=d.get("eur", 0.0),
+            price_eur=d.get("eur") or (d.get("usd", 0) * _EUR_USD_RATE),
             change_24h=d.get("usd_24h_change") or 0,
         )
         for sym, cid in _TOP_COINS
@@ -504,7 +504,7 @@ def get_price(coin: str):
     return CryptoPriceItem(
         symbol=coin.upper(),
         price_usd=d.get("usd", 0),
-        price_eur=d.get("eur", 0.0),
+        price_eur=d.get("eur") or (d.get("usd", 0) * _EUR_USD_RATE),
         change_24h=d.get("usd_24h_change") or 0,
         market_cap=d.get("usd_market_cap"),
     )
