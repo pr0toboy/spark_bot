@@ -120,8 +120,11 @@ def _price_one(coin_id: str) -> dict | None:
 
 def _btc_balance(addr: str) -> float | None:
     try:
-        r = requests.get(f"https://blockchain.info/q/addressbalance/{addr}", timeout=8)
-        return int(r.text.strip()) / 1e8
+        r = requests.get(f"https://mempool.space/api/address/{addr}", headers=_HDR, timeout=8)
+        if r.status_code != 200:
+            return None
+        cs = r.json().get("chain_stats", {})
+        return (cs.get("funded_txo_sum", 0) - cs.get("spent_txo_sum", 0)) / 1e8
     except Exception:
         return None
 
@@ -179,6 +182,7 @@ def _ckd_pub(chaincode: bytes, pubkey: bytes, index: int) -> tuple[bytes, bytes]
 
 def _btc_xpub_balance(xpub: str) -> float | None:
     try:
+        # zpub/ypub have the same payload structure as xpub — only version bytes differ
         raw = _b58_decode(xpub)[4:-4]
         cc, pk = raw[9:41], raw[41:]
         total = 0.0
@@ -285,7 +289,7 @@ def _get_balance(addr: str, chain: str) -> float | None:
 
 def _detect_chain(addr: str) -> str | None:
     a = addr.strip()
-    if a.startswith("xpub"):                         return "xpub"
+    if a.startswith(("xpub", "zpub", "ypub")):        return "xpub"
     if a.lower().startswith("0x") and len(a) == 42:  return "eth"
     if a.startswith("bc1") and len(a) <= 74:         return "btc"
     if a.startswith(("1", "3")) and len(a) <= 34:    return "btc"
