@@ -151,7 +151,7 @@ const SizedBox(height: 12),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
-                  initialValue: interval,
+                  value: interval,
                   decoration: const InputDecoration(labelText: 'Intervalle'),
                   items: const [
                     DropdownMenuItem(value: 15, child: Text('15 min')),
