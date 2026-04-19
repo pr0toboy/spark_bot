@@ -48,6 +48,7 @@ _STAKE_PRG = "Stake11111111111111111111111111111111111111"
 _DB_READY = False
 _PRICE_CACHE: dict = {}
 _PRICE_TTL = 60
+_EUR_USD_RATE: float = 0.92  # fallback, updated whenever CoinGecko returns EUR prices
 
 def _load_wallets() -> list[tuple[str, str, str]]:
     path = os.path.join(os.path.dirname(__file__), "..", "..", "wallets.json")
@@ -110,6 +111,7 @@ def _conn():
 
 
 def _prices(coin_ids: list[str]) -> dict[str, dict]:
+    global _EUR_USD_RATE
     if not coin_ids:
         return {}
     key = frozenset(coin_ids)
@@ -124,6 +126,11 @@ def _prices(coin_ids: list[str]) -> dict[str, dict]:
         if r.status_code != 200:
             return {}
         data = r.json()
+        # Update EUR/USD rate from any coin that has both usd and eur prices
+        for d in data.values():
+            if d.get("usd") and d.get("eur"):
+                _EUR_USD_RATE = d["eur"] / d["usd"]
+                break
         now = time.time()
         for k in [k for k, (ts, _) in _PRICE_CACHE.items() if now - ts >= _PRICE_TTL]:
             del _PRICE_CACHE[k]
@@ -461,8 +468,9 @@ def get_portfolio():
             if p.get("usd"):
                 bal_usd = bal * p["usd"]
                 total_usd += bal_usd
-            if p.get("eur"):
-                bal_eur = bal * p["eur"]
+            eur_price = p.get("eur") or (p["usd"] * _EUR_USD_RATE if p.get("usd") else None)
+            if eur_price:
+                bal_eur = bal * eur_price
                 total_eur += bal_eur
         wallets.append(CryptoWalletItem(
             label=label, address=address, chain=chain,
