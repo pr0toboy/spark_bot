@@ -1,4 +1,8 @@
+import hashlib
+import hmac as _hmac
 import sqlite3
+import struct
+import time
 import requests
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, HTTPException
@@ -7,10 +11,287 @@ from app.models import (
     CryptoAlertItem, CryptoAlertCreate, CryptoPriceItem,
     CryptoTrendItem, CryptoMarketItem,
 )
-from commands.crypto import (
-    _conn, _prices, _price_one, _cg_id, _get_balance,
-    _CHAIN_COIN, _detect_chain, _HDR, _CG,
-)
+from app.context import get_conn
+
+from ecdsa import SECP256k1 as _CURVE
+from ecdsa.ellipticcurve import PointJacobi as _PJ
+
+_CG  = "https://api.coingecko.com/api/v3"
+_HDR = {"Accept": "application/json", "User-Agent": "SparkBot/1.0"}
+_JSON_HDR = {**_HDR, "Content-Type": "application/json"}
+
+_B58  = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+_BC32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+
+_IDS = {
+    "btc": "bitcoin", "eth": "ethereum", "sol": "solana",
+    "bnb": "binancecoin", "xrp": "ripple", "ada": "cardano",
+    "doge": "dogecoin", "dot": "polkadot", "avax": "avalanche-2",
+    "matic": "matic-network", "link": "chainlink", "ltc": "litecoin",
+    "uni": "uniswap", "atom": "cosmos", "near": "near",
+    "trx": "tron", "shib": "shiba-inu", "pepe": "pepe",
+    "op": "optimism", "arb": "arbitrum", "sui": "sui", "apt": "aptos",
+}
+_CHAIN_COIN   = {"btc": "bitcoin", "xpub": "bitcoin", "eth": "ethereum",
+                 "avax": "avalanche-2", "sol": "solana", "dot": "polkadot"}
+_CHAIN_SYM    = {"btc": "₿", "xpub": "₿", "eth": "Ξ", "avax": "▲", "sol": "◎", "dot": "●"}
+_CHAIN_TICKER = {"btc": "BTC", "xpub": "BTC", "eth": "ETH", "avax": "AVAX", "sol": "SOL", "dot": "DOT"}
+
+_SOL_RPC   = "https://api.mainnet-beta.solana.com"
+_STAKE_PRG = "Stake11111111111111111111111111111111111111"
+
+_DB_READY = False
+_PRICE_CACHE: dict = {}
+_PRICE_TTL = 60
+
+
+def _cg_id(coin: str) -> str:
+    return _IDS.get(coin.lower(), coin.lower())
+
+
+def _b58_decode(s: str) -> bytes:
+    n = 0
+    for c in s:
+        n = n * 58 + _B58.index(c)
+    leading = len(s) - len(s.lstrip("1"))
+    return b"\x00" * leading + n.to_bytes((n.bit_length() + 7) // 8 or 1, "big")
+
+
+def _conn():
+    global _DB_READY
+    c = get_conn()
+    c.execute("""CREATE TABLE IF NOT EXISTS crypto_wallets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        label TEXT NOT NULL UNIQUE,
+        address TEXT NOT NULL,
+        chain TEXT NOT NULL)""")
+    c.execute("""CREATE TABLE IF NOT EXISTS crypto_alerts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        coin TEXT NOT NULL,
+        direction TEXT NOT NULL CHECK(direction IN ('above','below')),
+        price REAL NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1)""")
+    if not _DB_READY:
+        row = c.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='crypto_wallets'").fetchone()
+        if row and "CHECK" in row[0]:
+            c.execute("ALTER TABLE crypto_wallets RENAME TO _cw_old")
+            c.execute("""CREATE TABLE crypto_wallets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                label TEXT NOT NULL UNIQUE,
+                address TEXT NOT NULL,
+                chain TEXT NOT NULL)""")
+            c.execute("INSERT INTO crypto_wallets SELECT * FROM _cw_old")
+            c.execute("DROP TABLE _cw_old")
+        c.execute("""UPDATE crypto_wallets SET chain='avax'
+                     WHERE chain='eth'
+                     AND (LOWER(label) LIKE '%avalanche%' OR LOWER(label) LIKE '%avax%')""")
+        _DB_READY = True
+    c.commit()
+    return c
+
+
+def _prices(coin_ids: list[str]) -> dict[str, dict]:
+    if not coin_ids:
+        return {}
+    key = frozenset(coin_ids)
+    cached = _PRICE_CACHE.get(key)
+    if cached and time.time() - cached[0] < _PRICE_TTL:
+        return cached[1]
+    try:
+        r = requests.get(f"{_CG}/simple/price", headers=_HDR, timeout=8, params={
+            "ids": ",".join(coin_ids), "vs_currencies": "usd",
+            "include_24hr_change": "true", "include_market_cap": "true",
+        })
+        if r.status_code != 200:
+            return {}
+        data = r.json()
+        now = time.time()
+        for k in [k for k, (ts, _) in _PRICE_CACHE.items() if now - ts >= _PRICE_TTL]:
+            del _PRICE_CACHE[k]
+        _PRICE_CACHE[key] = (now, data)
+        return data
+    except Exception:
+        return {}
+
+
+def _price_one(coin_id: str) -> dict | None:
+    return _prices([coin_id]).get(coin_id)
+
+
+def _btc_balance(addr: str) -> float | None:
+    try:
+        r = requests.get(f"https://blockchain.info/q/addressbalance/{addr}", timeout=8)
+        return int(r.text.strip()) / 1e8
+    except Exception:
+        return None
+
+
+def _bech32_polymod(vals: list) -> int:
+    GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
+    chk = 1
+    for v in vals:
+        b = chk >> 25
+        chk = ((chk & 0x1FFFFFF) << 5) ^ v
+        for i in range(5):
+            if (b >> i) & 1:
+                chk ^= GEN[i]
+    return chk
+
+
+def _convertbits(data: bytes, fb: int, tb: int) -> list:
+    acc, bits, ret = 0, 0, []
+    for v in data:
+        acc = ((acc << fb) | v) & 0x3FFFFFFF
+        bits += fb
+        while bits >= tb:
+            bits -= tb
+            ret.append((acc >> bits) & ((1 << tb) - 1))
+    if bits:
+        ret.append((acc << (tb - bits)) & ((1 << tb) - 1))
+    return ret
+
+
+def _p2wpkh_address(pubkey: bytes) -> str:
+    h160 = hashlib.new("ripemd160", hashlib.sha256(pubkey).digest()).digest()
+    data = [0] + _convertbits(h160, 8, 5)
+    hrp = "bc"
+    pre = [ord(c) >> 5 for c in hrp] + [0] + [ord(c) & 31 for c in hrp]
+    chk = _bech32_polymod(pre + data + [0] * 6) ^ 1
+    return hrp + "1" + "".join(_BC32[d] for d in data) + \
+           "".join(_BC32[(chk >> (5 * (5 - i))) & 31] for i in range(6))
+
+
+def _ckd_pub(chaincode: bytes, pubkey: bytes, index: int) -> tuple[bytes, bytes]:
+    h = _hmac.new(chaincode, pubkey + struct.pack(">I", index), hashlib.sha512).digest()
+    il, ir = int.from_bytes(h[:32], "big"), h[32:]
+    G = _CURVE.generator
+    c = _CURVE.curve
+    p = c.p()
+    pf, px = pubkey[0], int.from_bytes(pubkey[1:], "big")
+    y2 = (pow(px, 3, p) + c.a() * px + c.b()) % p
+    py = pow(y2, (p + 1) // 4, p)
+    if (py % 2) != (pf - 2):
+        py = p - py
+    pt = il * G + _PJ(c, px, py, 1)
+    cx, cy = int(pt.x()), int(pt.y())
+    return ir, bytes([2 if cy % 2 == 0 else 3]) + cx.to_bytes(32, "big")
+
+
+def _btc_xpub_balance(xpub: str) -> float | None:
+    try:
+        raw = _b58_decode(xpub)[4:-4]
+        cc, pk = raw[9:41], raw[41:]
+        total = 0.0
+        GAP = 10
+        for branch in (0, 1):
+            bcc, bpk = _ckd_pub(cc, pk, branch)
+            gap = 0
+            for i in range(50):
+                _, cpk = _ckd_pub(bcc, bpk, i)
+                r = requests.get(f"https://mempool.space/api/address/{_p2wpkh_address(cpk)}",
+                                 headers=_HDR, timeout=8)
+                if r.status_code != 200:
+                    gap += 1
+                    if gap >= GAP:
+                        break
+                    continue
+                cs = r.json().get("chain_stats", {})
+                total += (cs.get("funded_txo_sum", 0) - cs.get("spent_txo_sum", 0)) / 1e8
+                gap = 0 if cs.get("tx_count", 0) else gap + 1
+                if gap >= GAP:
+                    break
+        return total
+    except Exception:
+        return None
+
+
+def _eth_balance(addr: str) -> float | None:
+    try:
+        r = requests.get(f"https://eth.blockscout.com/api/v2/addresses/{addr}", headers=_HDR, timeout=8)
+        return int(r.json()["coin_balance"]) / 1e18 if r.status_code == 200 else None
+    except Exception:
+        return None
+
+
+def _avax_balance(addr: str) -> float | None:
+    try:
+        r = requests.post("https://api.avax.network/ext/bc/C/rpc",
+            json={"jsonrpc": "2.0", "id": 1, "method": "eth_getBalance", "params": [addr, "latest"]},
+            headers=_JSON_HDR, timeout=8)
+        return int(r.json()["result"], 16) / 1e18
+    except Exception:
+        return None
+
+
+def _sol_rpc(method: str, params: list) -> dict:
+    r = requests.post(_SOL_RPC,
+        json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+        headers=_JSON_HDR, timeout=10)
+    return r.json()
+
+
+def _sol_balance(addr: str) -> float | None:
+    try:
+        liquid = _sol_rpc("getBalance", [addr])["result"]["value"] / 1e9
+        sigs = [s["signature"] for s in
+                _sol_rpc("getSignaturesForAddress", [addr, {"limit": 50}]).get("result", [])]
+        candidates: set[str] = set()
+        for sig in sigs:
+            tx = _sol_rpc("getTransaction",
+                          [sig, {"encoding": "json", "maxSupportedTransactionVersion": 0}]).get("result")
+            if not tx or _STAKE_PRG not in tx["transaction"]["message"]["accountKeys"]:
+                continue
+            meta = tx["meta"]
+            for i, acc in enumerate(tx["transaction"]["message"]["accountKeys"]):
+                if acc in (addr, _STAKE_PRG):
+                    continue
+                if meta["postBalances"][i] >= 500_000_000:
+                    candidates.add(acc)
+        staked = 0.0
+        for acc in candidates:
+            v = _sol_rpc("getAccountInfo", [acc, {"encoding": "base64"}]).get("result", {}).get("value")
+            if v and v.get("owner") == _STAKE_PRG:
+                staked += v["lamports"] / 1e9
+        return liquid + staked
+    except Exception:
+        return None
+
+
+def _dot_balance(addr: str) -> float | None:
+    try:
+        raw = _b58_decode(addr)
+        pubkey = raw[1:33]
+        TW = "26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9"
+        key = "0x" + TW + hashlib.blake2b(pubkey, digest_size=16).digest().hex() + pubkey.hex()
+        r = requests.post("https://rpc.polkadot.io",
+            json={"jsonrpc": "2.0", "id": 1, "method": "state_getStorage", "params": [key]},
+            headers=_JSON_HDR, timeout=8)
+        result = r.json().get("result")
+        if not result:
+            return 0.0
+        raw_data = bytes.fromhex(result[2:])
+        return int.from_bytes(raw_data[16:32], "little") / 1e10
+    except Exception:
+        return None
+
+
+def _get_balance(addr: str, chain: str) -> float | None:
+    return {
+        "btc": _btc_balance, "xpub": _btc_xpub_balance,
+        "eth": _eth_balance, "avax": _avax_balance,
+        "sol": _sol_balance, "dot": _dot_balance,
+    }.get(chain, lambda _: None)(addr)
+
+
+def _detect_chain(addr: str) -> str | None:
+    a = addr.strip()
+    if a.startswith("xpub"):                         return "xpub"
+    if a.lower().startswith("0x") and len(a) == 42:  return "eth"
+    if a.startswith("bc1") and len(a) <= 74:         return "btc"
+    if a.startswith(("1", "3")) and len(a) <= 34:    return "btc"
+    if 43 <= len(a) <= 44:                           return "sol"
+    if a.startswith("1") and 46 <= len(a) <= 50:     return "dot"
+    return None
 
 router = APIRouter(prefix="/api/crypto", tags=["crypto"])
 

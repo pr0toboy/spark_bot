@@ -1,12 +1,15 @@
 from fastapi import APIRouter
 from app.models import SettingsUpdate, SettingsResponse
 from app.deps import load_ctx
-from commands.model import (
-    DEFAULT_ANTHROPIC, DEFAULT_GROQ, DEFAULT_GLM,
-    ANTHROPIC_MODELS, GROQ_MODELS, GLM_MODELS,
-)
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
+
+ANTHROPIC_MODELS = ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"]
+GROQ_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"]
+GLM_MODELS = ["glm-4-plus", "glm-4", "glm-4-air", "glm-4-flash", "glm-z1-flash"]
+DEFAULT_ANTHROPIC = ANTHROPIC_MODELS[0]
+DEFAULT_GROQ = GROQ_MODELS[0]
+DEFAULT_GLM = GLM_MODELS[0]
 
 
 @router.get("", response_model=SettingsResponse)

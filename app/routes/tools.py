@@ -1,7 +1,13 @@
 from fastapi import APIRouter, HTTPException
 from app.models import ToolAction, ToolItem
 from app.deps import load_ctx
-from commands.tools import REGISTRY
+REGISTRY = {
+    "obsidian": {
+        "description": "Accès au vault Obsidian pour /ai (lecture/écriture de notes)",
+        "requires": "vault_path",
+        "requires_msg": "Configure d'abord un vault dans Paramètres.",
+    },
+}
 
 router = APIRouter(prefix="/api/tools", tags=["tools"])
 

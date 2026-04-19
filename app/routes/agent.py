@@ -4,15 +4,15 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 
 from app.models import AgentCreate, AgentItem, AgentRunItem, AgentUpdate
-from commands.agent import _init_tables, run_agent
-from context import get_conn
+from app.services.agent import init_tables, run_agent
+from app.context import get_conn
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 
 def _conn():
     c = get_conn()
-    _init_tables(c)
+    init_tables(c)
     return c
 
 

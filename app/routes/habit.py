@@ -1,10 +1,82 @@
 from datetime import date, timedelta
 from fastapi import APIRouter, HTTPException
 from app.models import HabitItem, HabitCreate, HabitStats, HabitCheckResult
-from commands.habit import _init_tables, _resolve, _streak, _week_done_set
-from context import get_conn
+import sqlite3
+from app.context import get_conn
 
 router = APIRouter(prefix="/api/habits", tags=["habits"])
+
+
+def _init_tables(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS habits (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT NOT NULL UNIQUE,
+            freq_num    INTEGER NOT NULL DEFAULT 1,
+            freq_den    INTEGER NOT NULL DEFAULT 1,
+            archived    INTEGER NOT NULL DEFAULT 0,
+            position    INTEGER NOT NULL DEFAULT 0,
+            created_at  TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS habit_entries (
+            id       INTEGER PRIMARY KEY AUTOINCREMENT,
+            habit_id INTEGER NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
+            date     TEXT NOT NULL,
+            value    REAL NOT NULL DEFAULT 1,
+            notes    TEXT NOT NULL DEFAULT '',
+            UNIQUE(habit_id, date)
+        )
+    """)
+    conn.commit()
+
+
+def _week_done_set(conn: sqlite3.Connection, habit_id: int) -> set[str]:
+    today = date.today()
+    start = str(today - timedelta(days=6))
+    end = str(today)
+    return {
+        r[0] for r in conn.execute(
+            "SELECT date FROM habit_entries WHERE habit_id=? AND date BETWEEN ? AND ?",
+            (habit_id, start, end),
+        ).fetchall()
+    }
+
+
+def _streak(conn: sqlite3.Connection, habit_id: int, freq_num: int, freq_den: int) -> tuple[int, int]:
+    rows = conn.execute(
+        "SELECT date FROM habit_entries WHERE habit_id=? ORDER BY date DESC", (habit_id,)
+    ).fetchall()
+    done_dates = {r[0] for r in rows}
+    if not done_dates:
+        return 0, 0
+    today = date.today()
+    min_date = date.fromisoformat(min(done_dates))
+
+    def _window_done(start: date) -> bool:
+        end = start + timedelta(days=freq_den - 1)
+        return sum(1 for d in done_dates if str(start) <= d <= str(end)) >= freq_num
+
+    windows: list[date] = []
+    cur = min_date
+    while cur <= today:
+        windows.append(cur)
+        cur += timedelta(days=freq_den)
+
+    current = best = run = 0
+    for w in reversed(windows):
+        if _window_done(w):
+            run += 1
+            best = max(best, run)
+        else:
+            if current == 0:
+                current = run
+            run = 0
+    if current == 0:
+        current = run
+    best = max(best, run)
+    return current, best
 
 
 def _conn():

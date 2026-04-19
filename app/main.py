@@ -11,11 +11,11 @@ _scheduler = BackgroundScheduler(daemon=True)
 
 def _scheduler_tick():
     from datetime import datetime, timezone
-    from commands.agent import _init_tables, run_agent
-    from context import get_conn
+    from app.services.agent import init_tables, run_agent
+    from app.context import get_conn
 
     conn = get_conn()
-    _init_tables(conn)
+    init_tables(conn)
     now = datetime.now(timezone.utc)
     rows = conn.execute(
         "SELECT id, interval_minutes, last_run FROM agents WHERE enabled=1"

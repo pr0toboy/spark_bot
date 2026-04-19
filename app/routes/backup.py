@@ -4,9 +4,9 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
-from context import get_conn, Context, DB_PATH
-from commands.agent import _init_tables as _agent_init
-from commands.habit import _init_tables as _habit_init
+from app.context import get_conn, Context, DB_PATH
+from app.services.agent import init_tables as _agent_init
+from app.routes.habit import _init_tables as _habit_init
 
 router = APIRouter(prefix="/api/backup", tags=["backup"])
 
