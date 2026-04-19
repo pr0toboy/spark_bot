@@ -16,6 +16,9 @@ venv/
 # Données locales (contient la clé API — ne jamais committer)
 data/
 
+# Wallets privés — ne jamais committer
+wallets.json
+
 # Personnalisation locale de l'IA
 SPARK.md
 

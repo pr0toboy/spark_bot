@@ -1,5 +1,7 @@
 import hashlib
 import hmac as _hmac
+import json
+import os
 import sqlite3
 import struct
 import time
@@ -33,9 +35,12 @@ _IDS = {
     "op": "optimism", "arb": "arbitrum", "sui": "sui", "apt": "aptos",
 }
 _CHAIN_COIN   = {"btc": "bitcoin", "xpub": "bitcoin", "eth": "ethereum",
-                 "avax": "avalanche-2", "sol": "solana", "dot": "polkadot"}
-_CHAIN_SYM    = {"btc": "₿", "xpub": "₿", "eth": "Ξ", "avax": "▲", "sol": "◎", "dot": "●"}
-_CHAIN_TICKER = {"btc": "BTC", "xpub": "BTC", "eth": "ETH", "avax": "AVAX", "sol": "SOL", "dot": "DOT"}
+                 "avax": "avalanche-2", "sol": "solana", "dot": "polkadot",
+                 "arb": "ethereum", "hl": "usd-coin"}
+_CHAIN_SYM    = {"btc": "₿", "xpub": "₿", "eth": "Ξ", "avax": "▲", "sol": "◎", "dot": "●",
+                 "arb": "Ξ", "hl": "$"}
+_CHAIN_TICKER = {"btc": "BTC", "xpub": "BTC", "eth": "ETH", "avax": "AVAX", "sol": "SOL", "dot": "DOT",
+                 "arb": "ETH", "hl": "USDC"}
 
 _SOL_RPC   = "https://api.mainnet-beta.solana.com"
 _STAKE_PRG = "Stake11111111111111111111111111111111111111"
@@ -43,6 +48,14 @@ _STAKE_PRG = "Stake11111111111111111111111111111111111111"
 _DB_READY = False
 _PRICE_CACHE: dict = {}
 _PRICE_TTL = 60
+
+def _load_wallets() -> list[tuple[str, str, str]]:
+    path = os.path.join(os.path.dirname(__file__), "..", "..", "wallets.json")
+    try:
+        with open(os.path.normpath(path)) as f:
+            return [(w["label"], w["address"], w["chain"]) for w in json.load(f)]
+    except FileNotFoundError:
+        return []
 
 
 def _cg_id(coin: str) -> str:
@@ -85,6 +98,12 @@ def _conn():
         c.execute("""UPDATE crypto_wallets SET chain='avax'
                      WHERE chain='eth'
                      AND (LOWER(label) LIKE '%avalanche%' OR LOWER(label) LIKE '%avax%')""")
+        for label, addr, chain in _load_wallets():
+            c.execute("INSERT OR IGNORE INTO crypto_wallets (label,address,chain) VALUES (?,?,?)",
+                      (label, addr, chain))
+        c.execute("UPDATE crypto_wallets SET chain='arb' WHERE label='Rabby' AND chain='eth'")
+        c.execute("""INSERT OR IGNORE INTO crypto_wallets (label,address,chain)
+                     SELECT 'Hyperliquid', address, 'hl' FROM crypto_wallets WHERE label='Rabby'""")
         _DB_READY = True
     c.commit()
     return c
@@ -217,6 +236,31 @@ def _eth_balance(addr: str) -> float | None:
         return None
 
 
+def _arb_balance(addr: str) -> float | None:
+    try:
+        r = requests.post("https://arb1.arbitrum.io/rpc",
+            json={"jsonrpc": "2.0", "id": 1, "method": "eth_getBalance", "params": [addr, "latest"]},
+            headers=_JSON_HDR, timeout=8)
+        return int(r.json()["result"], 16) / 1e18
+    except Exception:
+        return None
+
+
+def _hl_balance(addr: str) -> float | None:
+    try:
+        r = requests.post("https://api.hyperliquid.xyz/info",
+            json={"type": "clearinghouseState", "user": addr},
+            headers=_JSON_HDR, timeout=8)
+        perp = float(r.json().get("marginSummary", {}).get("accountValue", 0)) if r.status_code == 200 else 0.0
+        r2 = requests.post("https://api.hyperliquid.xyz/info",
+            json={"type": "spotClearinghouseState", "user": addr},
+            headers=_JSON_HDR, timeout=8)
+        spot = sum(float(b.get("total", 0)) for b in (r2.json().get("balances") or []) if r2.status_code == 200)
+        return perp + spot
+    except Exception:
+        return None
+
+
 def _avax_balance(addr: str) -> float | None:
     try:
         r = requests.post("https://api.avax.network/ext/bc/C/rpc",
@@ -276,6 +320,7 @@ def _get_balance(addr: str, chain: str) -> float | None:
         "btc": _btc_balance, "xpub": _btc_xpub_balance,
         "eth": _eth_balance, "avax": _avax_balance,
         "sol": _sol_balance, "dot": _dot_balance,
+        "arb": _arb_balance, "hl": _hl_balance,
     }.get(chain, lambda _: None)(addr)
 
 
